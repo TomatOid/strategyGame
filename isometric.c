@@ -14,6 +14,8 @@
 Vector3 camera_position; // the center of the viewport
 int camera_width = 512; 
 int camera_height = 512;
+int render_scale = 2;
+int on_screen_tiles = 12;
 SDL_Texture* tile_textures[256] = { NULL };
 
 int clamp(int number, int minimum, int maximum)
@@ -89,11 +91,13 @@ int main()
     loadAllTextures(main_renderer);
     // Now initialize a level
     Level current_level;
-    // loadLevel(&current_level, "level0");
-    current_level.size.x = 16;
-    current_level.size.y = 3;
-    current_level.size.z = 16;
-    current_level.tiles = calloc(16 * 3 * 16, 1);
+    if (!loadLevel(&current_level, "level0"))
+    {
+        current_level.size.x = 16;
+        current_level.size.y = 3;
+        current_level.size.z = 16;
+        current_level.tiles = calloc(16 * 3 * 16, 1);
+    }
     int mouse_x, mouse_y, last_mouse_x, last_mouse_y;
     int placement_world_y = 0;
     SDL_GetMouseState(&mouse_x, &mouse_y);
@@ -102,6 +106,11 @@ int main()
     SDL_DisplayMode display_mode;
     SDL_GetDesktopDisplayMode(0, &display_mode);
     SDL_Rect window_rect = { 0, 0, display_mode.w, display_mode.h };
+    {
+        int maximum_dimension = (display_mode.w > display_mode.h) ? display_mode.w : display_mode.h;
+        render_scale = maximum_dimension / (TILE_HALF_WIDTH_PX * on_screen_tiles);
+    }
+    SDL_RenderSetScale(main_renderer, render_scale, render_scale);
     if (window_rect.w > window_rect.h)
     {
         camera_height = (camera_height * window_rect.h) / window_rect.w;
@@ -111,7 +120,7 @@ int main()
         camera_width = (camera_width * window_rect.w) / window_rect.h;
     }
     printf("%d, %d\n", camera_height, camera_width);
-    SDL_Texture *screen_texture = SDL_CreateTexture(main_renderer, 0, SDL_TEXTUREACCESS_TARGET, camera_width, camera_height);
+    //SDL_Texture *screen_texture = SDL_CreateTexture(main_renderer, 0, SDL_TEXTUREACCESS_TARGET, camera_width, camera_height);
     for (;;)
     {
         start_time = SDL_GetTicks();
@@ -119,14 +128,15 @@ int main()
         last_mouse_x = mouse_x;
         last_mouse_y = mouse_y;
         SDL_GetMouseState(&mouse_x, &mouse_y);
-        mouse_x = (mouse_x * camera_height) / window_rect.h;
-        mouse_y = (mouse_y * camera_width) / window_rect.w;
+        mouse_x /= render_scale;
+        mouse_y /= render_scale;
         SDL_Event user_event;
         while (SDL_PollEvent(&user_event))
         {
             switch (user_event.type)
             {
             case SDL_QUIT:
+                saveLevel(&current_level, "level0");
                 exit(0);
                 break;
             case SDL_MOUSEBUTTONDOWN:
@@ -254,7 +264,6 @@ int main()
         int block_min_z = clamp(((camera_position.y - camera_position.x) / 2 - (camera_width + 1) / 2 - (camera_height + 3) / 4) / TILE_HALF_WIDTH_PX, 0, current_level.size.z);
         int block_max_z = clamp(((camera_position.y - camera_position.x) / 2 + camera_width + (camera_height + 1) / 2 + current_level.size.y + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX, 0, current_level.size.z);
         SDL_Rect source_rectangle = { 0, 0, 2 * TILE_HALF_WIDTH_PX, 2 * TILE_HALF_DEPTH_PX + TILE_HEIGHT_PX };
-        SDL_SetRenderTarget(main_renderer, screen_texture);
         SDL_RenderClear(main_renderer);
         for (int y = 0; y < current_level.size.y; y++)
         {
@@ -289,7 +298,7 @@ int main()
             }
         }
         SDL_SetRenderTarget(main_renderer, NULL);
-        SDL_RenderCopy(main_renderer, screen_texture, NULL, &window_rect);
+        //SDL_RenderCopy(main_renderer, screen_texture, NULL, &window_rect);
         SDL_RenderPresent(main_renderer);
         SDL_SetRenderDrawColor(main_renderer, 255, 255, 255, 0);
         SDL_RenderClear(main_renderer);
