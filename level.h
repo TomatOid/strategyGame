@@ -22,7 +22,7 @@ int loadLevel(Level *level, const char *path)
     // the number of bytes to copy will be the product of x, y, and z
     size_t next_copy_size = level->size.x * level->size.y * level->size.z;
     level->tiles = calloc(next_copy_size, 1);
-    fread(&level->tiles, sizeof(char), next_copy_size, level_file);
+    fread(level->tiles, sizeof(char), next_copy_size, level_file);
     // now, copy the start position
     fread(&level->start_positions, sizeof(Vector3), sizeof(level->start_positions) / sizeof(Vector3), level_file);
     return 1;
@@ -36,7 +36,7 @@ int saveLevel(Level *level, const char *path)
     // first write the size
     fwrite(&level->size, sizeof(Vector3), 1, level_file);
 
-    fwrite(&level->tiles, sizeof(char), level->size.x * level->size.y * level->size.z, level_file);
+    fwrite(level->tiles, sizeof(char), level->size.x * level->size.y * level->size.z, level_file);
 
     fwrite(&level->start_positions, sizeof(Vector3), sizeof(level->start_positions) / sizeof(Vector3), level_file);
     return 1;
