@@ -30,16 +30,16 @@ int loadLevel(Level *level, const char *path)
 
 char getTileAt(Vector3 position, Level *level)
 {
-    return level->tiles[position.x + position.z * level->size.z + position.y * level->size.z * level->size.y];
+    return level->tiles[position.x + position.z * level->size.x + position.y * level->size.x * level->size.z];
 }
 
 int setTileAt(char tile, Vector3 position, Level *level)
 {
-    if (position.x > 0 && position.x < level->size.x
-    && position.y > 0 && position.y < level->size.y
-    && position.z > 0 && position.z < level->size.z)
+    if (position.x >= 0 && position.x < level->size.x
+    && position.y >= 0 && position.y < level->size.y
+    && position.z >= 0 && position.z < level->size.z)
     {
-        level->tiles[position.x + position.z * level->size.z + position.y * level->size.z * level->size.y] = tile;
+        level->tiles[position.x + position.z * level->size.x + position.y * level->size.x * level->size.z] = tile;
         return 1;
     } else return 0;
 }
