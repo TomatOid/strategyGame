@@ -8,6 +8,7 @@ typedef struct Level
     Vector3 size;
     char *tiles;
     Vector3 start_positions[3];
+    
     // TODO: number of enemies and such
 } Level;
 

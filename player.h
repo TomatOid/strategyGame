@@ -11,5 +11,4 @@ enum
 typedef struct Player
 {
     int player_class;
-    Vector3 position;
 } Player;

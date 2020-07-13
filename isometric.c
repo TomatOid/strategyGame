@@ -5,9 +5,9 @@
 #include <string.h>
 #include <stdint.h>
 
-#define TILE_HALF_WIDTH_PX 32
-#define TILE_HALF_DEPTH_PX 16
-#define TILE_HEIGHT_PX 38
+#define TILE_HALF_WIDTH_PX 16
+#define TILE_HALF_DEPTH_PX 8
+#define TILE_HEIGHT_PX 18
 #define SCROLL_COOLDOWN 100
 #define FRAME_MILISECONDS 20
 
@@ -35,9 +35,16 @@ enum
 {
     AIR_TILE,
     GRASS_TILE,
-    WOOD_PLANKS_TILE,
-    STONE_TILE,
-    GRASSY_STONE_TILE
+    GRASS_ROCKS_TILE,
+    SNOW_GRASS_TILE,
+    SNOW_GRASS_ROCKS_TILE,
+    HOT_GRASS_TILE,
+    HOT_GRASS_ROCKS_TILE,
+    COBBLE_TILE,
+    STONE_BRICKS_TILE,
+    STONE_BRICKS_1_TILE,
+    STONE_BRICKS_1_MOSSY_TILE,
+    WATER_TILE
 };
 
 typedef struct 
@@ -52,13 +59,41 @@ int editor_selected_tile = AIR_TILE;
 
 int loadAllTextures(SDL_Renderer *renderer)
 {
-    SDL_Surface *temp_surface = SDL_LoadBMP("grassblock.bmp");
+    SDL_Surface *temp_surface = SDL_LoadBMP("grass.bmp");
     if (!temp_surface) { puts("texture not found"); }
     tile_textures[GRASS_TILE] = SDL_CreateTextureFromSurface(renderer, temp_surface);
     SDL_FreeSurface(temp_surface);
-    temp_surface = SDL_LoadBMP("woodplanks.bmp");
+    temp_surface = SDL_LoadBMP("grass_rocks.bmp");
     if (!temp_surface) { puts("texture not found"); }
-    tile_textures[WOOD_PLANKS_TILE] = SDL_CreateTextureFromSurface(renderer, temp_surface);
+    tile_textures[GRASS_ROCKS_TILE] = SDL_CreateTextureFromSurface(renderer, temp_surface);
+    SDL_FreeSurface(temp_surface);
+    temp_surface = SDL_LoadBMP("snow_grass.bmp");
+    if (!temp_surface) { puts("texture not found"); }
+    tile_textures[SNOW_GRASS_TILE] = SDL_CreateTextureFromSurface(renderer, temp_surface);
+    SDL_FreeSurface(temp_surface);
+    temp_surface = SDL_LoadBMP("snow_grass_rocks.bmp");
+    if (!temp_surface) { puts("texture not found"); }
+    tile_textures[SNOW_GRASS_ROCKS_TILE] = SDL_CreateTextureFromSurface(renderer, temp_surface);
+    SDL_FreeSurface(temp_surface);
+    temp_surface = SDL_LoadBMP("hot_grass.bmp");
+    if (!temp_surface) { puts("texture not found"); }
+    tile_textures[HOT_GRASS_TILE] = SDL_CreateTextureFromSurface(renderer, temp_surface);
+    SDL_FreeSurface(temp_surface);
+    temp_surface = SDL_LoadBMP("hot_grass_rocks.bmp");
+    if (!temp_surface) { puts("texture not found"); }
+    tile_textures[HOT_GRASS_ROCKS_TILE] = SDL_CreateTextureFromSurface(renderer, temp_surface);
+    SDL_FreeSurface(temp_surface);
+    temp_surface = SDL_LoadBMP("cobble.bmp");
+    if (!temp_surface) { puts("texture not found"); }
+    tile_textures[COBBLE_TILE] = SDL_CreateTextureFromSurface(renderer, temp_surface);
+    SDL_FreeSurface(temp_surface);
+    temp_surface = SDL_LoadBMP("stone_bricks.bmp");
+    if (!temp_surface) { puts("texture not found"); }
+    tile_textures[STONE_BRICKS_TILE] = SDL_CreateTextureFromSurface(renderer, temp_surface);
+    SDL_FreeSurface(temp_surface);
+    temp_surface = SDL_LoadBMP("stone_bricks_1.bmp");
+    if (!temp_surface) { puts("texture not found"); }
+    tile_textures[STONE_BRICKS_1_TILE] = SDL_CreateTextureFromSurface(renderer, temp_surface);
     SDL_FreeSurface(temp_surface);
 }
 
@@ -93,6 +128,7 @@ int main()
     Level current_level;
     if (!loadLevel(&current_level, "level0"))
     {
+        // if the file does not exist, create a blank level
         current_level.size.x = 16;
         current_level.size.y = 3;
         current_level.size.z = 16;
@@ -120,6 +156,9 @@ int main()
         camera_width = (camera_width * window_rect.w) / window_rect.h;
     }
     printf("%d, %d\n", camera_height, camera_width);
+
+    int texture_width, texture_height;
+    SDL_QueryTexture(tile_textures[GRASS_TILE], NULL, NULL, &texture_width, &texture_height);
     //SDL_Texture *screen_texture = SDL_CreateTexture(main_renderer, 0, SDL_TEXTUREACCESS_TARGET, camera_width, camera_height);
     for (;;)
     {
@@ -263,7 +302,8 @@ int main()
         // y = 0  -- level height  
         int block_min_z = clamp(((camera_position.y - camera_position.x) / 2 - (camera_width + 1) / 2 - (camera_height + 3) / 4) / TILE_HALF_WIDTH_PX, 0, current_level.size.z);
         int block_max_z = clamp(((camera_position.y - camera_position.x) / 2 + camera_width + (camera_height + 1) / 2 + current_level.size.y + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX, 0, current_level.size.z);
-        SDL_Rect source_rectangle = { 0, 0, 2 * TILE_HALF_WIDTH_PX, 2 * TILE_HALF_DEPTH_PX + TILE_HEIGHT_PX };
+
+        SDL_Rect source_rectangle = { 0, 0, texture_width, texture_height };
         SDL_RenderClear(main_renderer);
         for (int y = 0; y < current_level.size.y; y++)
         {
@@ -291,7 +331,7 @@ int main()
                         // calculate the position at which to draw it
                         int screen_x, screen_y;
                         worldToScreen(world, camera_position.x, camera_position.y, &screen_x, &screen_y);
-                        SDL_Rect destination_rectangle = { screen_x, screen_y, source_rectangle.w, source_rectangle.h };
+                        SDL_Rect destination_rectangle = { screen_x, screen_y, source_rectangle.w, source_rectangle.h};
                         SDL_RenderCopy(main_renderer, tile_textures[current_tile], NULL, &destination_rectangle);
                     }
                 }
