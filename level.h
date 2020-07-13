@@ -3,6 +3,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define TILE_HALF_WIDTH_PX 16
+#define TILE_HALF_DEPTH_PX TILE_HALF_WIDTH_PX / 2
+#define TILE_HEIGHT_PX 18
+#define CELL_HAS_ENTITY_FLAG 0x80
+
 typedef struct Level
 {
     Vector3 size;
@@ -10,6 +15,8 @@ typedef struct Level
     Vector3 start_positions[3];
     
     // TODO: number of enemies and such
+    uint32_t entities_count;
+
 } Level;
 
 // remember to free the last level before running again
@@ -50,11 +57,35 @@ char getTileAt(Vector3 position, Level *level)
 
 int setTileAt(char tile, Vector3 position, Level *level)
 {
+    tile &= (char)~CELL_HAS_ENTITY_FLAG;
     if (position.x >= 0 && position.x < level->size.x
     && position.y >= 0 && position.y < level->size.y
     && position.z >= 0 && position.z < level->size.z)
     {
-        level->tiles[position.x + position.z * level->size.x + position.y * level->size.x * level->size.z] = tile;
+        level->tiles[position.x + position.z * level->size.x + position.y * level->size.x * level->size.z] &= CELL_HAS_ENTITY_FLAG;
+        level->tiles[position.x + position.z * level->size.x + position.y * level->size.x * level->size.z] |= tile;
+        return 1;
+    } else return 0;
+}
+
+int setFlagAt(Vector3 position, Level *level)
+{
+    if (position.x >= 0 && position.x < level->size.x
+    && position.y >= 0 && position.y < level->size.y
+    && position.z >= 0 && position.z < level->size.z)
+    {
+        level->tiles[position.x + position.z * level->size.x + position.y * level->size.x * level->size.z] |= CELL_HAS_ENTITY_FLAG;
+        return 1;
+    } else return 0;
+}
+
+int clearFlagAt(Vector3 position, Level *level)
+{
+    if (position.x >= 0 && position.x < level->size.x
+    && position.y >= 0 && position.y < level->size.y
+    && position.z >= 0 && position.z < level->size.z)
+    {
+        level->tiles[position.x + position.z * level->size.x + position.y * level->size.x * level->size.z] &= (char)~CELL_HAS_ENTITY_FLAG;
         return 1;
     } else return 0;
 }
