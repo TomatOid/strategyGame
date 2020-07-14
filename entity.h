@@ -10,9 +10,9 @@
 Vector3 entityToWorldPosition(Vector3 entity_position)
 {
     Vector3 world_position = entity_position;
-    world_position.x /= TILE_HALF_WIDTH_PX;
-    world_position.z /= TILE_HALF_WIDTH_PX;
-    world_position.y /= TILE_HEIGHT_PX;
+    world_position.x = (world_position.x) / TILE_HALF_WIDTH_PX;
+    world_position.z = (world_position.z) / TILE_HALF_WIDTH_PX;
+    world_position.y = (world_position.y + TILE_HEIGHT_PX - 1) / TILE_HEIGHT_PX;
     return world_position;
 }
 
@@ -36,6 +36,7 @@ typedef struct Entity
     // to convert to block coordinates, divide x and z by TILE_HALF_WIDTH_PX
     // and divide y by TILE_HEIGHT_PX
     Vector3 position;
+    Vector3 size;
     //unsigned int entity_id;
     int type;
     void *specific_data;
@@ -66,4 +67,10 @@ void moveEntity(Entity *entity, Vector3 new_position, HashTable *table, Level* l
 typedef struct PlacementCursor
 {
     char tile_id;
+    int mode;
 } PlacementCursor;
+
+typedef struct Tree
+{
+
+};

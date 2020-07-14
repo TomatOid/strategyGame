@@ -52,7 +52,13 @@ int saveLevel(Level *level, const char *path)
 
 char getTileAt(Vector3 position, Level *level)
 {
-    return level->tiles[position.x + position.z * level->size.x + position.y * level->size.x * level->size.z];
+    if (position.x >= 0 && position.x < level->size.x
+    && position.y >= 0 && position.y < level->size.y
+    && position.z >= 0 && position.z < level->size.z)
+    {
+        return level->tiles[position.y + position.x * level->size.y + position.z * level->size.y * level->size.x];
+    }
+    return 0;
 }
 
 int setTileAt(char tile, Vector3 position, Level *level)
@@ -62,8 +68,8 @@ int setTileAt(char tile, Vector3 position, Level *level)
     && position.y >= 0 && position.y < level->size.y
     && position.z >= 0 && position.z < level->size.z)
     {
-        level->tiles[position.x + position.z * level->size.x + position.y * level->size.x * level->size.z] &= CELL_HAS_ENTITY_FLAG;
-        level->tiles[position.x + position.z * level->size.x + position.y * level->size.x * level->size.z] |= tile;
+        level->tiles[position.y + position.x * level->size.y + position.z * level->size.y * level->size.x] &= CELL_HAS_ENTITY_FLAG;
+        level->tiles[position.y + position.x * level->size.y + position.z * level->size.y * level->size.x] |= tile;
         return 1;
     } else return 0;
 }
@@ -74,7 +80,7 @@ int setFlagAt(Vector3 position, Level *level)
     && position.y >= 0 && position.y < level->size.y
     && position.z >= 0 && position.z < level->size.z)
     {
-        level->tiles[position.x + position.z * level->size.x + position.y * level->size.x * level->size.z] |= CELL_HAS_ENTITY_FLAG;
+        level->tiles[position.y + position.x * level->size.y + position.z * level->size.y * level->size.x] |= CELL_HAS_ENTITY_FLAG;
         return 1;
     } else return 0;
 }
@@ -85,7 +91,7 @@ int clearFlagAt(Vector3 position, Level *level)
     && position.y >= 0 && position.y < level->size.y
     && position.z >= 0 && position.z < level->size.z)
     {
-        level->tiles[position.x + position.z * level->size.x + position.y * level->size.x * level->size.z] &= (char)~CELL_HAS_ENTITY_FLAG;
+        level->tiles[position.y + position.x * level->size.y + position.z * level->size.y * level->size.x] &= (char)~CELL_HAS_ENTITY_FLAG;
         return 1;
     } else return 0;
 }
