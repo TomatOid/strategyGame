@@ -15,7 +15,7 @@ Vector3 camera_position; // the center of the viewport
 int camera_width = 512; 
 int camera_height = 512;
 int render_scale = 2;
-int on_screen_tiles = 12;
+int on_screen_tiles = 16;
 
 int clamp(int number, int minimum, int maximum)
 {
@@ -58,7 +58,6 @@ Vector3 screenToWorld(int screen_x, int screen_y, int camera_x, int camera_y, in
     Vector3 world_coords;
     int term_a = (screen_y + TILE_HALF_DEPTH_PX / 2 + camera_y + (world_y) * TILE_HEIGHT_PX) / (TILE_HALF_DEPTH_PX);
     int term_b = (screen_x + camera_x > 0) ? (screen_x + TILE_HALF_WIDTH_PX / 2 + camera_x) / (TILE_HALF_WIDTH_PX) : (screen_x - TILE_HALF_WIDTH_PX / 2 + camera_x) / (TILE_HALF_WIDTH_PX);
-    printf("%d, %d\n", term_a, term_b); 
     world_coords.x = (term_a + term_b - 1) / 2;
     world_coords.y = world_y;
     world_coords.z = (term_a - term_b + 1) / 2;
@@ -264,9 +263,6 @@ int main()
 
         // now move the cursor entity
         {
-            SDL_SetRenderDrawColor(main_renderer, 0, 0, 0, 255);
-            SDL_RenderDrawPoint(main_renderer, mouse_x, mouse_y - editor_cursor_entity.position.y);
-            SDL_SetRenderDrawColor(main_renderer, 255, 255, 255, 255);
             Vector3 cursor_world = screenToWorld(mouse_x, mouse_y - editor_cursor_entity.position.y, camera_position.x, camera_position.y, editor_cursor_entity.position.y / TILE_HEIGHT_PX);
             //cursor_world.y = editor_cursor_entity.position.y / TILE_HEIGHT_PX;
 
