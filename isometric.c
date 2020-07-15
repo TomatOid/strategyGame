@@ -317,24 +317,7 @@ int main()
         {
         //int a = 5;
             int b_max = min(a, current_level.size.x + current_level.size.y + current_level.size.z - a);
-            for (int b = 0; b <= b_max; b++)
-            {
-                for (int c = 0; c <= a - b; c++)
-                {
-                Vector3 world = { b, c, a - b - c };
-                char current_tile = getTileAt(world, &current_level);
-                current_tile &= (char)~CELL_HAS_ENTITY_FLAG;
-                if (current_tile && tile_textures[current_tile])
-                {
-                    // calculate the position at which to draw it
-                    int screen_x, screen_y;
-                    worldToScreen(world, camera_position.x, camera_position.y, &screen_x, &screen_y);
-                    SDL_Rect destination_rectangle = { screen_x, screen_y, source_rectangle.w, source_rectangle.h};
-                    SDL_RenderCopy(main_renderer, tile_textures[current_tile], NULL, &destination_rectangle);
-                }
-                }
-            }
-            for (int b = 0; b <= b_max; b++)
+                        for (int b = 0; b <= b_max; b++)
             {
                 for (int c = 0; c <= a - b; c++)
                 {
@@ -360,6 +343,24 @@ int main()
                     }
                 }
             }
+            for (int b = 0; b <= b_max; b++)
+            {
+                for (int c = 0; c <= a - b; c++)
+                {
+                Vector3 world = { b, c, a - b - c };
+                char current_tile = getTileAt(world, &current_level);
+                current_tile &= (char)~CELL_HAS_ENTITY_FLAG;
+                if (current_tile && tile_textures[current_tile])
+                {
+                    // calculate the position at which to draw it
+                    int screen_x, screen_y;
+                    worldToScreen(world, camera_position.x, camera_position.y, &screen_x, &screen_y);
+                    SDL_Rect destination_rectangle = { screen_x, screen_y, source_rectangle.w, source_rectangle.h};
+                    SDL_RenderCopy(main_renderer, tile_textures[current_tile], NULL, &destination_rectangle);
+                }
+                }
+            }
+
         }
         SDL_SetRenderTarget(main_renderer, NULL);
         //SDL_RenderCopy(main_renderer, screen_texture, NULL, &window_rect);
