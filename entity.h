@@ -9,10 +9,10 @@
 
 Vector3 entityToWorldPosition(Vector3 entity_position)
 {
-    //int a = (entity_position.x + entity_position.z + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
-    //int b = (entity_position.x - entity_position.z + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
-    entity_position.x = (entity_position.x + TILE_HALF_DEPTH_PX - 1) / TILE_HALF_WIDTH_PX;
-    entity_position.z = (entity_position.z + TILE_HALF_DEPTH_PX - 1) / TILE_HALF_WIDTH_PX;
+    int a = (entity_position.x + entity_position.z + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
+    int b = (entity_position.x - entity_position.z + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
+    entity_position.x = (a + b - 1) / 2;
+    entity_position.z = (a - b) / 2;
     entity_position.y /= TILE_HEIGHT_PX;
     return entity_position;
 }
