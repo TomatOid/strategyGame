@@ -93,6 +93,11 @@ void drawEditorCursor(Entity *cursor_entity, SDL_Renderer *renderer, int camera_
     }
 }
 
+int min(int a, int b)
+{
+    return (a < b) ? a : b;
+}
+
 uint32_t start_time;
 
 int main()
@@ -182,6 +187,7 @@ int main()
                     {
                         Vector3 world_position = entityToWorldPosition(editor_cursor_entity.position);
                         setTileAt(editor_cursor.tile_id, world_position, &current_level);
+                        printf("placed block at: %d %d %d\n", world_position.x, world_position.y, world_position.z);
                     }
                     break;
                 }
@@ -310,33 +316,29 @@ int main()
         for (int a = 0; a < (current_level.size.x + current_level.size.y + current_level.size.z); a++)
         {
         //int a = 5;
-            for (int c = -(current_level.size.z + current_level.size.x) / 4; c < (current_level.size.z + current_level.size.x) / 4; c++)
+            int b_max = min(a, current_level.size.x + current_level.size.y + current_level.size.z - a);
+            for (int b = 0; b <= b_max; b++)
             {
-                for (int b = -(current_level.size.x - current_level.size.y + current_level.size.z) / 4; b < (current_level.size.x - current_level.size.y + current_level.size.z) / 4; b++)
+                for (int c = 0; c <= a - b; c++)
                 {
-
-                    Vector3 world = { (a + b - 2 * c) / 4, (a - b + 1) / 2, (a + b + 2 * c + 3) / 4 };
-                    char current_tile = getTileAt(world, &current_level);
-                    current_tile &= (char)~CELL_HAS_ENTITY_FLAG;
-                    if (current_tile && tile_textures[current_tile])
-                    {
-                        // calculate the position at which to draw it
-                        int screen_x, screen_y;
-                        worldToScreen(world, camera_position.x, camera_position.y, &screen_x, &screen_y);
-                        SDL_Rect destination_rectangle = { screen_x, screen_y, source_rectangle.w, source_rectangle.h};
-                        SDL_RenderCopy(main_renderer, tile_textures[current_tile], NULL, &destination_rectangle);
-                    }
-                    //                    Vector3 world = { (a + b) / 2, y, (a - b) / 2 };
-                    //char current_tile = getTileAt(world, &current_level);
-                    //int cell_has_entity = current_tile & CELL_HAS_ENTITY_FLAG;
-
+                Vector3 world = { b, c, a - b - c };
+                char current_tile = getTileAt(world, &current_level);
+                current_tile &= (char)~CELL_HAS_ENTITY_FLAG;
+                if (current_tile && tile_textures[current_tile])
+                {
+                    // calculate the position at which to draw it
+                    int screen_x, screen_y;
+                    worldToScreen(world, camera_position.x, camera_position.y, &screen_x, &screen_y);
+                    SDL_Rect destination_rectangle = { screen_x, screen_y, source_rectangle.w, source_rectangle.h};
+                    SDL_RenderCopy(main_renderer, tile_textures[current_tile], NULL, &destination_rectangle);
+                }
                 }
             }
-            for (int c = -(current_level.size.z + current_level.size.x) / 4; c < (current_level.size.z + current_level.size.x) / 4; c++)
+            for (int b = 0; b <= b_max; b++)
             {
-                for (int b = -(current_level.size.x - current_level.size.y + current_level.size.z) / 4; b < (current_level.size.x - current_level.size.y + current_level.size.z) / 4; b++)
+                for (int c = 0; c <= a - b; c++)
                 {
-                    Vector3 world = { (a + b - 2 * c) / 4, (a - b + 1) / 2, (a + b + 2 * c + 3) / 4 };
+                    Vector3 world = { b, c, a - b - c };
                     char current_tile = getTileAt(world, &current_level);
                     int cell_has_entity = current_tile & CELL_HAS_ENTITY_FLAG;
 
