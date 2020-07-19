@@ -6,13 +6,14 @@
 #include "HashTable.h"
 #include "level.h"
 
-
 Vector3 entityToWorldPosition(Vector3 entity_position)
 {
-    int a = (entity_position.x + entity_position.z + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
-    int b = (entity_position.x - entity_position.z + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
-    entity_position.x = (a + b - 1) / 2;
-    entity_position.z = (a - b) / 2;
+    //int a = (entity_position.x + entity_position.z + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
+    //int b = (entity_position.x - entity_position.z + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
+    //entity_position.x = (a + b - 1) / 2;
+    //entity_position.z = (a - b) / 2;
+    entity_position.x /= TILE_HALF_WIDTH_PX;
+    entity_position.z /= TILE_HALF_WIDTH_PX;
     entity_position.y /= TILE_HEIGHT_PX;
     return entity_position;
 }
@@ -46,7 +47,7 @@ typedef struct Entity
     void (*draw)(struct Entity *, SDL_Renderer *, int, int);
 } Entity;
 
-void moveEntity(Entity *entity, Vector3 new_position, HashTable *table, Level* level)
+void moveEntity(Entity *entity, Vector3 new_position, HashTable *table, Level *level)
 {
     Vector3 position_world = entityToWorldPosition(entity->position);
     Vector3 new_position_world = entityToWorldPosition(new_position);
@@ -65,6 +66,12 @@ void moveEntity(Entity *entity, Vector3 new_position, HashTable *table, Level* l
     entity->position = new_position;
 }
 
+enum
+{
+    CURSOR_MODE_PLACE_TILE,
+    CURSOR_MODE_PLACE_ENTITY
+};
+
 typedef struct PlacementCursor
 {
     char tile_id;
@@ -73,5 +80,5 @@ typedef struct PlacementCursor
 
 typedef struct Tree
 {
-
+    int type;
 };

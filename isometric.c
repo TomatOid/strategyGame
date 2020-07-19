@@ -117,15 +117,18 @@ int main()
         current_level.size.z = 32;
         current_level.tiles = calloc(32 * 4 * 32, 1);
     }
+    // Initialize the hash table
     HashTable entity_by_location;
     entity_by_location.len = 100;
     entity_by_location.items = calloc(entity_by_location.len, sizeof(HashItem *));
     makePage(&entity_by_location.page, entity_by_location.len, sizeof(HashItem));
+    // Setup input stuff
     int mouse_x, mouse_y, last_mouse_x, last_mouse_y;
     int placement_world_y = 0;
     SDL_GetMouseState(&mouse_x, &mouse_y);
     Inputs user_input = { 0 };
     Inputs last_user_input = { 0 };
+    // More SDL graphics stuff
     SDL_DisplayMode display_mode;
     SDL_GetDesktopDisplayMode(0, &display_mode);
     SDL_Rect window_rect = { 0, 0, display_mode.w, display_mode.h };
@@ -134,19 +137,10 @@ int main()
         render_scale = maximum_dimension / (TILE_HALF_WIDTH_PX * on_screen_tiles);
     }
     SDL_RenderSetScale(main_renderer, render_scale, render_scale);
-    if (window_rect.w > window_rect.h)
-    {
-        camera_height = (camera_height * window_rect.h) / window_rect.w;
-    }
-    else
-    {
-        camera_width = (camera_width * window_rect.w) / window_rect.h;
-    }
-    printf("%d, %d\n", camera_height, camera_width);
-
+    // We will use these values later when drawing
     int texture_width, texture_height;
     SDL_QueryTexture(tile_textures[GRASS_TILE], NULL, NULL, &texture_width, &texture_height);
-
+    // Initialize the entities for the editor mode
     PlacementCursor editor_cursor = { AIR_TILE };
     Entity editor_cursor_entity = { 0 };
     editor_cursor_entity.type = ENTITY_EDITOR_CURSOR;
@@ -154,7 +148,6 @@ int main()
     editor_cursor_entity.specific_data = &editor_cursor;
     insertToTable(&entity_by_location, 0, &editor_cursor_entity);
 
-    //SDL_Texture *screen_texture = SDL_CreateTexture(main_renderer, 0, SDL_TEXTUREACCESS_TARGET, camera_width, camera_height);
     for (;;)
     {
         start_time = SDL_GetTicks();
@@ -192,6 +185,8 @@ int main()
                     break;
                 }
                 break;
+
+            // reset the bitflags when the button is released
             case SDL_MOUSEBUTTONUP:
                 switch (user_event.button.button)
                 {
@@ -281,10 +276,10 @@ int main()
 
         // now move the cursor entity
         {
-            //Vector3 cursor_world = screenToWorld(mouse_x, mouse_y - editor_cursor_entity.position.y, camera_position.x, camera_position.y, editor_cursor_entity.position.y / TILE_HEIGHT_PX);
-            //cursor_world.y = editor_cursor_entity.position.y / TILE_HEIGHT_PX;
+            Vector3 cursor_world = screenToWorld(mouse_x, mouse_y - editor_cursor_entity.position.y, camera_position.x, camera_position.y, editor_cursor_entity.position.y / TILE_HEIGHT_PX);
+            cursor_world.y = editor_cursor_entity.position.y / TILE_HEIGHT_PX;
 
-            moveEntity(&editor_cursor_entity, screenToEntity(mouse_x, mouse_y - editor_cursor_entity.position.y, camera_position.x, camera_position.y, editor_cursor_entity.position.y), &entity_by_location, &current_level);
+            moveEntity(&editor_cursor_entity, /*screenToEntity(mouse_x, mouse_y - editor_cursor_entity.position.y, camera_position.x, camera_position.y, editor_cursor_entity.position.y)*/worldToEntityPosition(cursor_world), &entity_by_location, &current_level);
         }
 
         // do panning
@@ -313,30 +308,33 @@ int main()
 
         SDL_Rect source_rectangle = { 0, 0, texture_width, texture_height };
 
-        for (int a = 0; a < (current_level.size.x + current_level.size.y + current_level.size.z); a++)
+        for (int a = 0; a <= (current_level.size.x + current_level.size.y + current_level.size.z - 3); a++)
         {
-        //int a = 5;
-            int b_max = min(a, current_level.size.x + current_level.size.y + current_level.size.z - a);
+        //int a = 11;
+            int b_max = min(a, current_level.size.x - 1);
             for (int b = 0; b <= b_max; b++)
             {
-                for (int c = 0; c <= a - b; c++)
+                int c_max = min(a - b, current_level.size.y - 1);
+                for (int c = -min(0, -(a - current_level.size.z - b + 1)); c <= c_max; c++)
                 {
-                Vector3 world = { b, c, a - b - c };
-                char current_tile = getTileAt(world, &current_level);
-                current_tile &= (char)~CELL_HAS_ENTITY_FLAG;
-                if (current_tile && tile_textures[current_tile])
-                {
-                    // calculate the position at which to draw it
-                    int screen_x, screen_y;
-                    worldToScreen(world, camera_position.x, camera_position.y, &screen_x, &screen_y);
-                    SDL_Rect destination_rectangle = { screen_x, screen_y, source_rectangle.w, source_rectangle.h};
-                    SDL_RenderCopy(main_renderer, tile_textures[current_tile], NULL, &destination_rectangle);
-                }
+                    Vector3 world = { b, c, a - b - c };
+                    //printf("%d %d %d\n", world.x, world.y, world.z);
+                    char current_tile = getTileAt(world, &current_level);
+                    current_tile &= (char)~CELL_HAS_ENTITY_FLAG;
+                    if (current_tile && tile_textures[current_tile])
+                    {
+                        // calculate the position at which to draw it
+                        int screen_x, screen_y;
+                        worldToScreen(world, camera_position.x, camera_position.y, &screen_x, &screen_y);
+                        SDL_Rect destination_rectangle = { screen_x, screen_y, source_rectangle.w, source_rectangle.h};
+                        SDL_RenderCopy(main_renderer, tile_textures[current_tile], NULL, &destination_rectangle);
+                    }
                 }
             }
             for (int b = 0; b <= b_max; b++)
             {
-                for (int c = 0; c <= a - b; c++)
+                int c_max = min(a - b, current_level.size.y);
+                for (int c = -min(0, -(a - current_level.size.z - b + 1)); c <= c_max; c++)
                 {
                     Vector3 world = { b, c, a - b - c };
                     char current_tile = getTileAt(world, &current_level);
@@ -344,7 +342,6 @@ int main()
 
                     if (cell_has_entity)
                     {
-                        
                         uint64_t key = hashVector3(world);
                         Entity *cell_entity = findInTable(&entity_by_location, key);
                         while (cell_entity)
