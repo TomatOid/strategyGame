@@ -3,6 +3,7 @@
 #include <string.h>
 
 #define BUFFER_SIZE 256
+const char *prefix = "tiles/";
 
 void toAllCapsAndUnderScores(char *str)
 {
@@ -30,8 +31,11 @@ int main(int argc, char** argv)
     fprintf(header_file, "SDL_Texture* tile_textures[256] = { NULL };\n");
     // first, generate the enum
     fprintf(header_file, "enum\n{\n");
-    //fprintf(header_file, "\tAIR_TILE");
-    for (int i = 1; i < argc; i++)
+    if (argc < 2) exit(EXIT_FAILURE);
+    strncpy(buffer, argv[1], BUFFER_SIZE - 1);
+    toAllCapsAndUnderScores(buffer);
+    fprintf(header_file, "\t%s_TILE", buffer);
+    for (int i = 2; i < argc; i++)
     {
         strncpy(buffer, argv[i], BUFFER_SIZE - 1);
         toAllCapsAndUnderScores(buffer);
@@ -44,7 +48,7 @@ int main(int argc, char** argv)
     {
         strncpy(buffer, argv[i], BUFFER_SIZE - 1);
         toAllCapsAndUnderScores(buffer);
-        fprintf(header_file, "\n\ttemp_surface = SDL_LoadBMP(\"%s\");", argv[i]);
+        fprintf(header_file, "\n\ttemp_surface = SDL_LoadBMP(\"%s%s\");", prefix, argv[i]);
         fprintf(header_file, "\n\ttile_textures[%s_TILE] = SDL_CreateTextureFromSurface(renderer, temp_surface);", buffer);
         fprintf(header_file, "\n\tSDL_FreeSurface(temp_surface);");
     }
