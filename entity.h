@@ -18,6 +18,14 @@ Vector3 entityToWorldPosition(Vector3 entity_position)
     return entity_position;
 }
 
+Vector3 entityToWorldPositionCeil(Vector3 entity_position)
+{
+    entity_position.x = (entity_position.x + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
+    entity_position.z = (entity_position.z + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
+    entity_position.y = (entity_position.y + TILE_HALF_WIDTH_PX - 1) / TILE_HEIGHT_PX;
+    return entity_position;
+}
+
 Vector3 worldToEntityPosition(Vector3 world_position)
 {
     Vector3 entity_position = world_position;
@@ -47,22 +55,53 @@ typedef struct Entity
     void (*draw)(struct Entity *, SDL_Renderer *, int, int);
 } Entity;
 
+int pointIsInPrism(Vector3 prism_least_corner, Vector3 prism_most_corner, Vector3 point)
+{
+    return (point.x >= prism_least_corner.x) && (point.x <= prism_most_corner.x)
+        && (point.y >= prism_least_corner.y) && (point.y <= prism_most_corner.y)
+        && (point.z >= prism_least_corner.z) && (point.z <= prism_most_corner.z);
+}
+
 void moveEntity(Entity *entity, Vector3 new_position, HashTable *table, Level *level)
 {
-    Vector3 position_world = entityToWorldPosition(entity->position);
-    Vector3 new_position_world = entityToWorldPosition(new_position);
-    // check if we need to move to a new cell
-    if (memcmp(&position_world, &new_position_world, sizeof(Vector3)) != 0)
+    // loop through the old prism, find the points that are not in the new prism and remove them
+    // then loop through the new prism and find the points that are not in the old prism and add them
+    Vector3 old_position_world_floor = entityToWorldPosition(entity->position);
+    Vector3 old_position_world_ceil = entityToWorldPosition(addVector3(entity->position, entity->size));
+    Vector3 new_position_world_floor = entityToWorldPosition(new_position);
+    Vector3 new_position_world_ceil = entityToWorldPosition(addVector3(new_position, entity->size));
+    for (int z = old_position_world_floor.z; z <= old_position_world_ceil.z; z++)
     {
-        // remove the flag from the old cell
-        clearFlagAt(position_world, level);
-        // put the flag in the new cell
-        setFlagAt(new_position_world, level);
-        uint64_t old_key = hashVector3(position_world);
-        uint64_t new_key = hashVector3(new_position_world);
-        removeFromTableByValue(table, old_key, entity);
-        insertToTable(table, new_key, entity);
-    } 
+        for (int x = old_position_world_floor.x; x <= old_position_world_ceil.x; x++)
+        {
+            for (int y = old_position_world_floor.y; y <= old_position_world_ceil.y; y++)
+            {
+                Vector3 old_point = { x, y, z };
+                if (!pointIsInPrism(new_position_world_floor, new_position_world_ceil, old_point))
+                {
+                    clearFlagAt(old_point, level);
+                    uint64_t key = hashVector3(old_point);
+                    removeFromTableByValue(table, key, entity);
+                }
+            }
+        }
+    }
+    for (int z = new_position_world_floor.z; z <= new_position_world_ceil.z; z++)
+    {
+        for (int x = new_position_world_floor.x; x <= new_position_world_ceil.x; x++)
+        {
+            for (int y = new_position_world_floor.y; y <= new_position_world_ceil.y; y++)
+            {
+                Vector3 new_point = { x, y, z };
+                if (!pointIsInPrism(old_position_world_floor, old_position_world_ceil, new_point))
+                {
+                    setFlagAt(new_point, level);
+                    uint64_t key = hashVector3(new_point);
+                    insertToTable(table, key, entity);
+                }
+            }
+        }
+    }
     entity->position = new_position;
 }
 
