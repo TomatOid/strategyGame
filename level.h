@@ -19,6 +19,29 @@ typedef struct Level
 
 } Level;
 
+
+int setFlagAt(Vector3 position, Level *level)
+{
+    if (position.x >= 0 && position.x < level->size.x
+    && position.y >= 0 && position.y < level->size.y
+    && position.z >= 0 && position.z < level->size.z)
+    {
+        level->tiles[position.y + position.x * level->size.y + position.z * level->size.y * level->size.x] |= CELL_HAS_ENTITY_FLAG;
+        return 1;
+    } else return 0;
+}
+
+int clearFlagAt(Vector3 position, Level *level)
+{
+    if (position.x >= 0 && position.x < level->size.x
+    && position.y >= 0 && position.y < level->size.y
+    && position.z >= 0 && position.z < level->size.z)
+    {
+        level->tiles[position.y + position.x * level->size.y + position.z * level->size.y * level->size.x] &= (char)~CELL_HAS_ENTITY_FLAG;
+        return 1;
+    } else return 0;
+}
+
 // remember to free the last level before running again
 int loadLevel(Level *level, const char *path)
 {
@@ -38,6 +61,18 @@ int loadLevel(Level *level, const char *path)
 
 int saveLevel(Level *level, const char *path)
 {
+    // clear all entity flags
+    for (int x = 0; x < level->size.x; x++)
+    {
+        for (int y = 0; y < level->size.y; y++)
+        {
+            for (int z = 0; z < level->size.z; z++)
+            {
+                Vector3 world = { x, y, z };
+                clearFlagAt(world, level);
+            }
+        }
+    }
     FILE *level_file = fopen(path, "w+");
     if (!level_file) { return 0; }
 
@@ -70,28 +105,6 @@ int setTileAt(char tile, Vector3 position, Level *level)
     {
         level->tiles[position.y + position.x * level->size.y + position.z * level->size.y * level->size.x] &= CELL_HAS_ENTITY_FLAG;
         level->tiles[position.y + position.x * level->size.y + position.z * level->size.y * level->size.x] |= tile;
-        return 1;
-    } else return 0;
-}
-
-int setFlagAt(Vector3 position, Level *level)
-{
-    if (position.x >= 0 && position.x < level->size.x
-    && position.y >= 0 && position.y < level->size.y
-    && position.z >= 0 && position.z < level->size.z)
-    {
-        level->tiles[position.y + position.x * level->size.y + position.z * level->size.y * level->size.x] |= CELL_HAS_ENTITY_FLAG;
-        return 1;
-    } else return 0;
-}
-
-int clearFlagAt(Vector3 position, Level *level)
-{
-    if (position.x >= 0 && position.x < level->size.x
-    && position.y >= 0 && position.y < level->size.y
-    && position.z >= 0 && position.z < level->size.z)
-    {
-        level->tiles[position.y + position.x * level->size.y + position.z * level->size.y * level->size.x] &= (char)~CELL_HAS_ENTITY_FLAG;
         return 1;
     } else return 0;
 }

@@ -49,10 +49,11 @@ typedef struct Entity
     Vector3 size;
     //unsigned int entity_id;
     int type;
+    int draw_on_top;
     void *specific_data;
     // interface function pointers
     void (*free_callback)(struct Entity *);
-    void (*draw)(struct Entity *, SDL_Renderer *, int, int);
+    void (*draw)(struct Entity *, SDL_Renderer *, int, int, SDL_Rect);
 } Entity;
 
 int pointIsInPrism(Vector3 prism_least_corner, Vector3 prism_most_corner, Vector3 point)
