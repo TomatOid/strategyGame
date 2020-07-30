@@ -20,3 +20,8 @@ uint64_t hashVector3(Vector3 vec)
     result |= ((uint64_t)vec.y & 0x0000FFFF) << 48;
     return result;
 }
+
+int componentSum(Vector3 vector)
+{
+    return vector.x + vector.y + vector.z;
+}

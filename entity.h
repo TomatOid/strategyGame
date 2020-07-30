@@ -6,32 +6,27 @@
 #include "HashTable.h"
 #include "level.h"
 
+// This determines the size of the fractional part of the entity position
+#define ENTITY_POSITION_MULTIPLIER 2
+
 Vector3 entityToWorldPosition(Vector3 entity_position)
 {
     //int a = (entity_position.x + entity_position.z + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
     //int b = (entity_position.x - entity_position.z + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
     //entity_position.x = (a + b - 1) / 2;
     //entity_position.z = (a - b) / 2;
-    entity_position.x /= TILE_HALF_WIDTH_PX;
-    entity_position.z /= TILE_HALF_WIDTH_PX;
-    entity_position.y /= TILE_HEIGHT_PX;
-    return entity_position;
-}
-
-Vector3 entityToWorldPositionCeil(Vector3 entity_position)
-{
-    entity_position.x = (entity_position.x + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
-    entity_position.z = (entity_position.z + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
-    entity_position.y = (entity_position.y + TILE_HALF_WIDTH_PX - 1) / TILE_HEIGHT_PX;
+    entity_position.x /= TILE_HALF_WIDTH_PX * ENTITY_POSITION_MULTIPLIER;
+    entity_position.z /= TILE_HALF_WIDTH_PX * ENTITY_POSITION_MULTIPLIER;
+    entity_position.y /= TILE_HEIGHT_PX * ENTITY_POSITION_MULTIPLIER;
     return entity_position;
 }
 
 Vector3 worldToEntityPosition(Vector3 world_position)
 {
     Vector3 entity_position = world_position;
-    entity_position.x *= TILE_HALF_WIDTH_PX;
-    entity_position.z *= TILE_HALF_WIDTH_PX;
-    entity_position.y *= TILE_HEIGHT_PX;
+    entity_position.x *= TILE_HALF_WIDTH_PX * ENTITY_POSITION_MULTIPLIER;
+    entity_position.z *= TILE_HALF_WIDTH_PX * ENTITY_POSITION_MULTIPLIER;
+    entity_position.y *= TILE_HEIGHT_PX * ENTITY_POSITION_MULTIPLIER;
     return entity_position;
 }
 
@@ -50,17 +45,50 @@ typedef struct Entity
     //unsigned int entity_id;
     int type;
     int draw_on_top;
+    int layer;
     void *specific_data;
     // interface function pointers
     void (*free_callback)(struct Entity *);
     void (*draw)(struct Entity *, SDL_Renderer *, int, int, SDL_Rect);
 } Entity;
 
+int entityLayerCompare(const void *a, const void *b)
+{
+    int a_layer = ((Entity *)a)->layer;
+    int b_layer = ((Entity *)b)->layer;
+    if (a_layer != b_layer) return a_layer - b_layer;
+    return componentSum(((Entity *)a)->position) - componentSum(((Entity *)b)->position);
+}
+
 int pointIsInPrism(Vector3 prism_least_corner, Vector3 prism_most_corner, Vector3 point)
 {
     return (point.x >= prism_least_corner.x) && (point.x <= prism_most_corner.x)
         && (point.y >= prism_least_corner.y) && (point.y <= prism_most_corner.y)
         && (point.z >= prism_least_corner.z) && (point.z <= prism_most_corner.z);
+}
+
+// this does not allocate
+void addEntity(Entity *entity, Vector3 position, Vector3 size, HashTable *table, Level *level)
+{
+    entity->position = position;
+    size.x *= ENTITY_POSITION_MULTIPLIER;
+    size.y *= ENTITY_POSITION_MULTIPLIER;
+    size.z *= ENTITY_POSITION_MULTIPLIER;
+    entity->size = size;
+    Vector3 world_floor = entityToWorldPosition(position);
+    Vector3 world_ceil = entityToWorldPosition(addVector3(position, size));
+    for (int z = world_floor.z; z <= world_ceil.z; z++)
+    {
+        for (int x = world_floor.x; x <= world_ceil.x; x++)
+        {
+            for (int y = world_floor.y; y <= world_ceil.y; y++)
+            {
+                Vector3 world = { x, y, z };
+                setFlagAt(world, level);
+                insertToTable(table, hashVector3(world), entity);
+            }
+        }
+    }
 }
 
 void moveEntity(Entity *entity, Vector3 new_position, HashTable *table, Level *level)

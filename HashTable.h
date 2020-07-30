@@ -57,6 +57,20 @@ void *findNextInTable(HashTable *table, uint64_t key)
     else { return NULL; }
 }
 
+size_t findAllInTable(HashTable *table, uint64_t key, void **return_buffer, size_t buffer_size)
+{
+    size_t hash = key % table->len;
+    size_t index = 0;
+    for (HashItem *curr = table->items[hash]; curr && (index < buffer_size); curr = curr->next)
+    {
+        if (curr->key == key)
+        {
+            return_buffer[index++] = curr->value;
+        }
+    }
+    return index;
+}
+
 void *removeFromTable(HashTable *table, uint64_t key)
 {
     size_t hash = key % table->len;

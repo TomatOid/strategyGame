@@ -16,7 +16,6 @@ typedef struct Level
     
     // TODO: number of enemies and such
     uint32_t entities_count;
-
 } Level;
 
 

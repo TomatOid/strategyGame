@@ -21,8 +21,7 @@ typedef struct
 void* blockAlloc(BlockPage* page)
 {
     // get a block location
-    page->top--;
-    ptrdiff_t my_block = page->top;
+    ptrdiff_t my_block = --page->top;
     // now, we can check if we got a valid block, and release it if it is invalid
     if (my_block < 0 || my_block >= (ptrdiff_t)page->numblk)
     {
