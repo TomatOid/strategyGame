@@ -63,7 +63,6 @@ void worldToScreen(Vector3 world, int camera_x, int camera_y, int *screen_x, int
 // In order to have a unique solution, the world y must be provided
 Vector3 screenToWorld(int screen_x, int screen_y, int camera_x, int camera_y, int world_y)
 {
-    // we need to assume a value for y so the equation has a unique solution
     Vector3 world_coords;
     int term_a = (screen_y + TILE_HALF_DEPTH_PX / 2 + camera_y + (world_y) * TILE_HEIGHT_PX) / (TILE_HALF_DEPTH_PX);
     int term_b = (screen_x + camera_x > 0) ? (screen_x + TILE_HALF_WIDTH_PX / 2 + camera_x) / (TILE_HALF_WIDTH_PX) 
@@ -151,8 +150,6 @@ int main()
     // We will use these values later when drawing
     int texture_width, texture_height;
     SDL_QueryTexture(tile_textures[GRASS_TILE], NULL, NULL, &texture_width, &texture_height);
-    SDL_Texture *top_texture = SDL_CreateTexture(main_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, window_rect.w, window_rect.h);
-    SDL_SetTextureBlendMode(top_texture, SDL_BLENDMODE_BLEND);
 
     // Now initialize a level
     Level current_level;
@@ -171,7 +168,6 @@ int main()
     makePage(&entity_by_location.page, entity_by_location.len, sizeof(HashItem));
     // Setup input stuff
     int mouse_x, mouse_y, last_mouse_x, last_mouse_y;
-    int placement_world_y = 0;
     SDL_GetMouseState(&mouse_x, &mouse_y);
     Inputs user_input = { 0 };
     Inputs last_user_input = { 0 };
@@ -355,7 +351,7 @@ int main()
             }
             else
             {
-                moveEntity(&editor_cursor_entity, screenToEntity(mouse_x, mouse_y - editor_cursor_entity.position.y / ENTITY_POSITION_MULTIPLIER,
+                moveEntity(&editor_cursor_entity, screenToEntity(mouse_x - TILE_HALF_WIDTH_PX, mouse_y - TILE_HALF_DEPTH_PX - editor_cursor_entity.position.y / ENTITY_POSITION_MULTIPLIER,
                         camera_position_x, camera_position_y, editor_cursor_entity.position.y), &entity_by_location, &current_level);
             }
         }
