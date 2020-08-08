@@ -11,6 +11,10 @@
 
 Vector3 entityToWorldPosition(Vector3 entity_position)
 {
+    //int a = (entity_position.x + entity_position.z + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
+    //int b = (entity_position.x - entity_position.z + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
+    //entity_position.x = (a + b - 1) / 2;
+    //entity_position.z = (a - b) / 2;
     entity_position.x /= TILE_HALF_WIDTH_PX * ENTITY_POSITION_MULTIPLIER;
     entity_position.z /= TILE_HALF_WIDTH_PX * ENTITY_POSITION_MULTIPLIER;
     entity_position.y /= TILE_HEIGHT_PX * ENTITY_POSITION_MULTIPLIER;
@@ -31,15 +35,6 @@ enum
     ENTITY_EDITOR_CURSOR
 };
 
-typedef struct EntityCoverShadow
-{
-    SDL_Texture *cover_accumulation;
-    SDL_Rect bounding_box;
-    SDL_Texture *current_animation_frame;
-    SDL_Texture *current_animation_frame_mask;
-    SDL_Texture *current_animation_frame_inverted_mask;
-} EntityCoverShadow;
-
 typedef struct Entity
 {
     // entity positions have pixel-level precision
@@ -52,7 +47,6 @@ typedef struct Entity
     int draw_on_top;
     int layer;
     void *specific_data;
-    EntityCoverShadow *cover_shadow;
     // interface function pointers
     void (*free_callback)(struct Entity *);
     void (*draw)(struct Entity *, SDL_Renderer *, int, int, SDL_Rect);
@@ -81,8 +75,8 @@ void addEntity(Entity *entity, Vector3 position, Vector3 size, HashTable *table,
     size.y *= ENTITY_POSITION_MULTIPLIER;
     size.z *= ENTITY_POSITION_MULTIPLIER;
     entity->size = size;
-    Vector3 world_floor = entityToWorldPosition(entity->position);
-    Vector3 world_ceil = entityToWorldPosition(addVector3(entity->position, size));
+    Vector3 world_floor = entityToWorldPosition(position);
+    Vector3 world_ceil = entityToWorldPosition(addVector3(position, size));
     for (int z = world_floor.z; z <= world_ceil.z; z++)
     {
         for (int x = world_floor.x; x <= world_ceil.x; x++)
@@ -99,7 +93,6 @@ void addEntity(Entity *entity, Vector3 position, Vector3 size, HashTable *table,
 
 void moveEntity(Entity *entity, Vector3 new_position, HashTable *table, Level *level)
 {
-    
     // loop through the old prism, find the points that are not in the new prism and remove them
     // then loop through the new prism and find the points that are not in the old prism and add them
     Vector3 old_position_world_floor = entityToWorldPosition(entity->position);
@@ -156,4 +149,4 @@ typedef struct PlacementCursor
 typedef struct Tree
 {
     int type;
-} Tree;
+};

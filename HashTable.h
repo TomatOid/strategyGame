@@ -20,22 +20,6 @@ typedef struct HashTable
     size_t num;
 } HashTable;
 
-typedef struct HashItemHead
-{
-    uint32_t birth_tick;
-    HashItem *first;
-} HashItemHead;
-
-typedef struct ResettableHashTable
-{
-    HashItemHead *items;
-    HashItem *last;
-    size_t max_items;
-    size_t items_count;
-    HashItem *memory_arena;
-    uint32_t current_tick; // reset counter
-} ResettableHashTable;
-
 bool insertToTable(HashTable *table, uint64_t key, void *value)
 {
     size_t hash = key % table->len;
@@ -126,47 +110,4 @@ void removeFromTableByValue(HashTable *table, uint64_t key, void *value)
         return;
     }
     else return;
-}
-
-bool insertToResettableTable(ResettableHashTable *table, uint64_t key, void *value)
-{
-    size_t hash = key % table->max_items;
-    if (table->items_count >= table->max_items) return false;
-    
-    HashItem *current = &table->memory_arena[table->items_count++];
-    // The next pointer should be null if the other item is out of date
-    current->next = (table->items[hash].birth_tick == table->current_tick) ? table->items[hash].first : NULL;
-    current->key = key;
-    current->value = value;
-    table->items[hash].first = current;
-    table->items[hash].birth_tick = table->current_tick;
-}
-
-void *findInResettableHashTable(ResettableHashTable *table, uint64_t key)
-{
-    size_t hash = key % table->max_items;
-    if (table->items[hash].birth_tick != table->current_tick) return NULL;
-    HashItem *current = table->items[hash].first;
-
-    while (current && current->key != key) current = current->next;
-
-    if (current) { table->last = current; return current->value; }
-    else return NULL;
-}
-
-void *findNextInResettableHashTable(ResettableHashTable *table, uint64_t key)
-{
-    HashItem *current = table->last->next;
-
-    while (current && current->key != key) current = current->next;
-
-    if (current) { table->last = current; return current->value; }
-    else return NULL;
-}
-
-void resetHashTable(ResettableHashTable *table)
-{
-    table->current_tick++;
-    table->items_count = 0;
-    table->last = NULL;
 }
