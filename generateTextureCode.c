@@ -28,7 +28,10 @@ int main(int argc, char** argv)
 {
     char buffer[BUFFER_SIZE] = { 0 };
     FILE *header_file = fopen("textures_generated.h", "w+");
-    fprintf(header_file, "SDL_Texture* tile_textures[256] = { NULL };\n");
+    fprintf(header_file, "#include \"texture_utils.h\"\n");
+    fprintf(header_file, "SDL_Texture *tile_textures[256] = { NULL };\n");
+    fprintf(header_file, "SDL_Texture *tile_mask_textures[256] = { NULL }; \n");
+    fprintf(header_file, "SDL_Texture *tile_inverted_mask_textures[256] = { NULL }; \n");
     // first, generate the enum
     fprintf(header_file, "enum\n{\n");
     if (argc < 2) exit(EXIT_FAILURE);
@@ -50,6 +53,10 @@ int main(int argc, char** argv)
         toAllCapsAndUnderScores(buffer);
         fprintf(header_file, "\n\ttemp_surface = SDL_LoadBMP(\"%s%s\");", prefix, argv[i]);
         fprintf(header_file, "\n\ttile_textures[%s_TILE] = SDL_CreateTextureFromSurface(renderer, temp_surface);", buffer);
+        fprintf(header_file, "\n\tsurfaceToMask(temp_surface);");
+        fprintf(header_file, "\n\ttile_mask_textures[%s_TILE] = SDL_CreateTextureFromSurface(renderer, temp_surface);", buffer);
+        fprintf(header_file, "\n\tinvertMask(temp_surface);");
+        fprintf(header_file, "\n\ttile_inverted_mask_textures[%s_TILE] = SDL_CreateTextureFromSurface(renderer, temp_surface);", buffer);
         fprintf(header_file, "\n\tSDL_FreeSurface(temp_surface);");
     }
     fprintf(header_file, "\n}\n");
