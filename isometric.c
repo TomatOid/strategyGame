@@ -12,27 +12,18 @@
 #define FRAME_MILISECONDS 20
 #define MAX_ENTITIES_PER_CELL 64
 #define TOP_ENTITIES_PER_LAYER 64
+#define MAX_COVER_SHADOWS 32
+#define SCREEN_GRID_SIZE_PX 70
 
 int camera_position_x, camera_position_y; // the top left corner of the viewport
 int render_scale = 2;
 int on_screen_tiles = 16;
+ResettableHashTable cover_shadow_table = { 0 };
+SDL_BlendMode shadow_blend_mode;
 
 int min(int a, int b)
 {
     return (a < b) ? a : b;
-}
-
-int clamp(int number, int minimum, int maximum)
-{
-    if (number < minimum)
-    {
-        return minimum;
-    }
-    else if (number > maximum)
-    {
-        return maximum;
-    }
-    else return number;
 }
 
 typedef struct 
@@ -84,6 +75,63 @@ Vector3 screenToEntity(int screen_x, int screen_y, int camera_x, int camera_y, i
     return entity_coords;
 }
 
+void renderOverlap(SDL_Renderer *renderer, SDL_Texture *source, SDL_Rect source_rectangle, SDL_Texture *destination, SDL_Rect destination_rectangle)
+{
+    SDL_SetRenderTarget(renderer, destination);
+    int intersection_min_x = -min(-source_rectangle.x, -destination_rectangle.x);
+    int intersection_max_x = min(source_rectangle.x + source_rectangle.w, destination_rectangle.x + destination_rectangle.w);
+    int intersection_min_y = -min(-source_rectangle.y, -destination_rectangle.y);
+    int intersection_max_y = min(source_rectangle.y + source_rectangle.h, destination_rectangle.y + destination_rectangle.h);
+    destination_rectangle.x = intersection_min_x - destination_rectangle.x * (destination != NULL);
+    destination_rectangle.y = intersection_min_y - destination_rectangle.y * (destination != NULL);
+    destination_rectangle.w = intersection_max_x - intersection_min_x;
+    destination_rectangle.h = intersection_max_y - intersection_min_y;
+    source_rectangle.x = intersection_min_x - source_rectangle.x;
+    source_rectangle.y = intersection_min_y - source_rectangle.y;
+    source_rectangle.w = intersection_max_x - intersection_min_x;
+    source_rectangle.h = intersection_max_y - intersection_min_y;
+    SDL_RenderCopy(renderer, source, &source_rectangle, &destination_rectangle);
+    SDL_SetRenderTarget(renderer, NULL);
+}
+
+void putCoverShadowInTable(EntityCoverShadow *cover_shadow)
+{
+    int min_x = cover_shadow->bounding_box.x / SCREEN_GRID_SIZE_PX;
+    int min_y = cover_shadow->bounding_box.y / SCREEN_GRID_SIZE_PX;
+    int max_x = (cover_shadow->bounding_box.x + cover_shadow->bounding_box.w) / SCREEN_GRID_SIZE_PX;
+    int max_y = (cover_shadow->bounding_box.y + cover_shadow->bounding_box.h) / SCREEN_GRID_SIZE_PX;
+
+    for (int x = min_x; x <= max_x; x++)
+    {
+        for (int y = min_y; y <= max_y; y++)
+        {
+            insertToResettableTable(&cover_shadow_table, (uint64_t)x << 32 | (uint64_t)y, cover_shadow);
+        }
+    }
+}
+
+void stampToCoverShadows(SDL_Rect screen_rectangle, SDL_Texture *texture, SDL_Renderer *renderer)
+{
+    int min_x = screen_rectangle.x / SCREEN_GRID_SIZE_PX;
+    int min_y = screen_rectangle.y / SCREEN_GRID_SIZE_PX;
+    int max_x = (screen_rectangle.x + screen_rectangle.w) / SCREEN_GRID_SIZE_PX;
+    int max_y = (screen_rectangle.y + screen_rectangle.h) / SCREEN_GRID_SIZE_PX;
+
+    for (int x = min_x; x <= max_x; x++)
+    {
+        for (int y = min_y; y <= max_y; y++)
+        {
+            uint64_t key = (uint64_t)x << 32 | (uint64_t)y;
+            EntityCoverShadow *shadow = findInResettableHashTable(&cover_shadow_table, key);
+            while (shadow)
+            {
+                renderOverlap(renderer, texture, screen_rectangle, shadow->cover_accumulation, shadow->bounding_box);
+                shadow = findNextInResettableHashTable(&cover_shadow_table, key);
+            }
+        }
+    }
+}
+
 void drawEditorCursor(Entity *cursor_entity, SDL_Renderer *renderer, int camera_x, int camera_y, SDL_Rect clipping_rectangle)
 {
     char tile = ((PlacementCursor *)cursor_entity->specific_data)->tile_id;
@@ -95,14 +143,20 @@ void drawEditorCursor(Entity *cursor_entity, SDL_Renderer *renderer, int camera_
         SDL_QueryTexture(tile_textures[tile], NULL, NULL, &texture_width, &texture_height);
         // To keep from spoiling the 3d effect, we only want to draw the texture in the intersection
         // between the tile's corresponding rectangle and the entities texture bounds
-        int intersection_min_x = -min(-clipping_rectangle.x, -screen_x);
-        int intersection_max_x = min(clipping_rectangle.x + clipping_rectangle.w, screen_x + texture_width);
-        int intersection_min_y = -min(-clipping_rectangle.y, -screen_y);
-        int intersection_max_y = min(clipping_rectangle.y + clipping_rectangle.h, screen_y + texture_height);
-        SDL_Rect src_rect = { intersection_min_x - screen_x, intersection_min_y - screen_y,
-            intersection_max_x - intersection_min_x, intersection_max_y - intersection_min_y };
-        SDL_Rect dest_rect = { intersection_min_x, intersection_min_y, intersection_max_x - intersection_min_x, intersection_max_y - intersection_min_y };
-        SDL_RenderCopy(renderer, tile_textures[tile], &src_rect, &dest_rect);
+        SDL_Rect source_rectangle = { screen_x, screen_y, texture_width, texture_height };
+        renderOverlap(renderer, tile_textures[tile], source_rectangle, NULL, clipping_rectangle);
+        cursor_entity->cover_shadow->bounding_box = source_rectangle;
+        cursor_entity->cover_shadow->current_animation_frame = tile_textures[tile];
+        cursor_entity->cover_shadow->current_animation_frame_mask = tile_mask_textures[tile];
+        cursor_entity->cover_shadow->current_animation_frame_inverted_mask = tile_mask_textures[tile];
+        //SDL_SetTextureBlendMode(cursor_entity->cover_shadow->cover_accumulation, SDL_BLENDMODE_NONE);
+        SDL_SetRenderTarget(renderer, cursor_entity->cover_shadow->cover_accumulation);
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 0);
+        SDL_RenderClear(renderer);
+        //SDL_RenderCopy(renderer, cursor_entity->cover_shadow->current_amimation_frame, NULL, NULL);
+        SDL_SetRenderTarget(renderer, NULL);
+        //SDL_SetTextureBlendMode(cursor_entity->cover_shadow->cover_accumulation, shadow_blend_mode);
+        putCoverShadowInTable(cursor_entity->cover_shadow);
     }
 }
 
@@ -133,7 +187,8 @@ int main()
     SDL_Init(SDL_INIT_EVERYTHING);
     SDL_Window *main_window;
     SDL_Renderer *main_renderer;
-    SDL_CreateWindowAndRenderer(1280, 720, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED, &main_window, &main_renderer);
+    if (!SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2")) puts("opengles2 not available");
+    SDL_CreateWindowAndRenderer(1280, 720, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_OPENGL, &main_window, &main_renderer);
     loadAllTextures(main_renderer);
 
     // More SDL graphics stuff
@@ -150,6 +205,8 @@ int main()
     // We will use these values later when drawing
     int texture_width, texture_height;
     SDL_QueryTexture(tile_textures[GRASS_TILE], NULL, NULL, &texture_width, &texture_height);
+    shadow_blend_mode = SDL_BLENDMODE_NONE;
+    SDL_GLContext gl_context = SDL_GL_CreateContext(main_window);
 
     // Now initialize a level
     Level current_level;
@@ -171,6 +228,12 @@ int main()
     SDL_GetMouseState(&mouse_x, &mouse_y);
     Inputs user_input = { 0 };
     Inputs last_user_input = { 0 };
+    // Cover shadows
+    cover_shadow_table.max_items = 5 * MAX_COVER_SHADOWS - 1;
+    cover_shadow_table.memory_arena = calloc(cover_shadow_table.max_items, sizeof(HashItem));
+    cover_shadow_table.items = calloc(cover_shadow_table.max_items, sizeof(HashItemHead));
+    EntityCoverShadow cover_shadows[MAX_COVER_SHADOWS] = { 0 };
+    size_t cover_shadows_count = 0;
     // Initialize the entities for the editor mode
     PlacementCursor editor_cursor = { AIR_TILE };
     Entity editor_cursor_entity = { 0 };
@@ -178,10 +241,15 @@ int main()
     editor_cursor_entity.draw_on_top = 0;
     editor_cursor_entity.draw = drawEditorCursor;
     editor_cursor_entity.specific_data = &editor_cursor;
+    editor_cursor_entity.cover_shadow = &cover_shadows[cover_shadows_count++];
+    editor_cursor_entity.cover_shadow->cover_accumulation = SDL_CreateTexture(main_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, texture_width, texture_height);
     {
         Vector3 size = { TILE_HALF_WIDTH_PX - 1, TILE_HEIGHT_PX - 1, TILE_HALF_WIDTH_PX - 1 };
         addEntity(&editor_cursor_entity, screenToEntity(mouse_x, mouse_y, camera_position_x, camera_position_y, 0), size, &entity_by_location, &current_level);
     }
+    if (SDL_SetTextureBlendMode(editor_cursor_entity.cover_shadow->cover_accumulation, shadow_blend_mode) < 0)
+        puts("Blend mode error."); 
+    
     void *entity_search_results[MAX_ENTITIES_PER_CELL];
     Entity *top_entity_array[TOP_ENTITIES_PER_LAYER];
     SDL_Rect top_clipping_rectangle_array[TOP_ENTITIES_PER_LAYER];
@@ -253,7 +321,7 @@ int main()
                     }
                     else if (user_event.wheel.y < 0)
                     {
-                        if (tile_textures[editor_cursor.tile_id - 1] || editor_cursor.tile_id == 1)
+                        if (editor_cursor.tile_id > 0 && tile_textures[editor_cursor.tile_id - 1])
                         {
                             editor_cursor.tile_id--;
                         }
@@ -435,6 +503,7 @@ int main()
                         // calculate the position at which to draw it
                         SDL_Rect destination_rectangle = { screen_x, screen_y, source_rectangle.w, source_rectangle.h};
                         SDL_RenderCopy(main_renderer, tile_textures[current_tile], NULL, &destination_rectangle);
+                        stampToCoverShadows(destination_rectangle, tile_textures[current_tile], main_renderer);
                     }
                 }
             }
@@ -448,6 +517,22 @@ int main()
                 }
             }
         }
+        for (int i = 0; i < cover_shadows_count; i++)
+        {
+            SDL_Rect source_rectangle = { 0, 0, cover_shadows[i].bounding_box.w, cover_shadows[i].bounding_box.h };
+            SDL_SetTextureAlphaMod(cover_shadows[i].cover_accumulation, 255);
+            SDL_SetTextureColorMod(cover_shadows[i].cover_accumulation, 16, 16, 16);
+            SDL_SetTextureBlendMode(cover_shadows[i].current_animation_frame_mask, SDL_BLENDMODE_ADD);
+            SDL_SetRenderDrawBlendMode(main_renderer, SDL_BLENDMODE_ADD);
+            SDL_RenderCopy(main_renderer, cover_shadows[i].current_animation_frame_inverted_mask, &source_rectangle, &cover_shadows[i].bounding_box);
+            SDL_SetRenderTarget(main_renderer, cover_shadows[i].cover_accumulation);
+            SDL_RenderCopy(main_renderer, cover_shadows[i].current_animation_frame_mask, NULL, NULL);
+            SDL_SetRenderTarget(main_renderer, NULL);
+            SDL_SetRenderDrawBlendMode(main_renderer, SDL_BLENDMODE_MOD);
+            SDL_RenderCopy(main_renderer, cover_shadows[i].cover_accumulation, &source_rectangle, &cover_shadows[i].bounding_box);
+            SDL_SetTextureBlendMode(cover_shadows[i].cover_accumulation, SDL_BLENDMODE_ADD);
+        }
+        resetHashTable(&cover_shadow_table);
 
         SDL_SetRenderTarget(main_renderer, NULL);
         SDL_RenderPresent(main_renderer);
