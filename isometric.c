@@ -22,19 +22,6 @@ int min(int a, int b)
     return (a < b) ? a : b;
 }
 
-int clamp(int number, int minimum, int maximum)
-{
-    if (number < minimum)
-    {
-        return minimum;
-    }
-    else if (number > maximum)
-    {
-        return maximum;
-    }
-    else return number;
-}
-
 typedef struct 
 {
     uint32_t last_scroll;
@@ -253,7 +240,7 @@ int main()
                     }
                     else if (user_event.wheel.y < 0)
                     {
-                        if (tile_textures[editor_cursor.tile_id - 1] || editor_cursor.tile_id == 1)
+                        if ((editor_cursor.tile_id > 0) && tile_textures[editor_cursor.tile_id - 1])
                         {
                             editor_cursor.tile_id--;
                         }
