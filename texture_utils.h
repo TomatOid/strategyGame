@@ -8,7 +8,7 @@ int surfaceToMask(SDL_Surface *surface)
     if (surface->format->BytesPerPixel != 4) return 0;
 
     uint32_t black = SDL_MapRGBA(surface->format, 0, 0, 0, SDL_ALPHA_OPAQUE);
-    uint32_t white = SDL_MapRGBA(surface->format, 255, 255, 255, SDL_ALPHA_OPAQUE);
+    uint32_t white = SDL_MapRGBA(surface->format, 255, 255, 255, SDL_ALPHA_TRANSPARENT);
     uint8_t a, r, g, b;
 
     SDL_LockSurface(surface);
@@ -28,7 +28,7 @@ int invertMask(SDL_Surface *surface)
     if (surface->format->BytesPerPixel != 4) return 0;
 
     uint32_t black = SDL_MapRGBA(surface->format, 0, 0, 0, SDL_ALPHA_OPAQUE);
-    uint32_t white = SDL_MapRGBA(surface->format, 255, 255, 255, SDL_ALPHA_OPAQUE);
+    uint32_t white = SDL_MapRGBA(surface->format, 255, 255, 255, SDL_ALPHA_TRANSPARENT);
     uint8_t a, r, g, b;
 
     SDL_LockSurface(surface);

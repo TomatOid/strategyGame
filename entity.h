@@ -11,10 +11,6 @@
 
 Vector3 entityToWorldPosition(Vector3 entity_position)
 {
-    //int a = (entity_position.x + entity_position.z + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
-    //int b = (entity_position.x - entity_position.z + TILE_HALF_WIDTH_PX - 1) / TILE_HALF_WIDTH_PX;
-    //entity_position.x = (a + b - 1) / 2;
-    //entity_position.z = (a - b) / 2;
     entity_position.x /= TILE_HALF_WIDTH_PX * ENTITY_POSITION_MULTIPLIER;
     entity_position.z /= TILE_HALF_WIDTH_PX * ENTITY_POSITION_MULTIPLIER;
     entity_position.y /= TILE_HEIGHT_PX * ENTITY_POSITION_MULTIPLIER;
@@ -35,6 +31,13 @@ enum
     ENTITY_EDITOR_CURSOR
 };
 
+typedef struct TextureData
+{
+    SDL_Texture *amimation_frame;
+    SDL_Texture *animation_frame_mask;
+    SDL_Rect bounds_rectangle;
+} TextureData;
+
 typedef struct Entity
 {
     // entity positions have pixel-level precision
@@ -47,6 +50,7 @@ typedef struct Entity
     int draw_on_top;
     int layer;
     void *specific_data;
+    TextureData *texture_data;
     // interface function pointers
     void (*free_callback)(struct Entity *);
     void (*draw)(struct Entity *, SDL_Renderer *, int, int, SDL_Rect);
@@ -149,4 +153,4 @@ typedef struct PlacementCursor
 typedef struct Tree
 {
     int type;
-};
+} Tree;

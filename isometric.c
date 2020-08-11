@@ -10,12 +10,20 @@
 
 #define SCROLL_COOLDOWN 100
 #define FRAME_MILISECONDS 20
+#define MAX_ENTITIES 128
 #define MAX_ENTITIES_PER_CELL 64
 #define TOP_ENTITIES_PER_LAYER 64
+#define MAX_ENTITY_SHADOWS 64
 
 int camera_position_x, camera_position_y; // the top left corner of the viewport
 int render_scale = 2;
 int on_screen_tiles = 16;
+
+void *entity_search_results[MAX_ENTITIES_PER_CELL];
+Entity *top_entity_array[TOP_ENTITIES_PER_LAYER];
+SDL_Rect top_clipping_rectangle_array[TOP_ENTITIES_PER_LAYER];
+TextureData entity_texture_data[MAX_ENTITIES] = { 0 };
+size_t entity_texture_data_count = 0;
 
 int min(int a, int b)
 {
@@ -90,6 +98,10 @@ void drawEditorCursor(Entity *cursor_entity, SDL_Renderer *renderer, int camera_
             intersection_max_x - intersection_min_x, intersection_max_y - intersection_min_y };
         SDL_Rect dest_rect = { intersection_min_x, intersection_min_y, intersection_max_x - intersection_min_x, intersection_max_y - intersection_min_y };
         SDL_RenderCopy(renderer, tile_textures[tile], &src_rect, &dest_rect);
+        cursor_entity->texture_data->amimation_frame = tile_textures[tile];
+        cursor_entity->texture_data->animation_frame_mask = tile_mask_textures[tile];
+        SDL_Rect bounds = { screen_x, screen_y, texture_width, texture_height };
+        cursor_entity->texture_data->bounds_rectangle = bounds;
     }
 }
 
@@ -147,17 +159,21 @@ int main()
         current_level.size.y = 6;
         current_level.size.z = 138;
         current_level.tiles = calloc(current_level.size.x * current_level.size.y * current_level.size.z, 1);
+
     }
+
     // Initialize the hash table
     HashTable entity_by_location;
     entity_by_location.len = 100;
     entity_by_location.items = calloc(entity_by_location.len, sizeof(HashItem *));
     makePage(&entity_by_location.page, entity_by_location.len, sizeof(HashItem));
+
     // Setup input stuff
     int mouse_x, mouse_y, last_mouse_x, last_mouse_y;
     SDL_GetMouseState(&mouse_x, &mouse_y);
     Inputs user_input = { 0 };
     Inputs last_user_input = { 0 };
+
     // Initialize the entities for the editor mode
     PlacementCursor editor_cursor = { AIR_TILE };
     Entity editor_cursor_entity = { 0 };
@@ -165,19 +181,16 @@ int main()
     editor_cursor_entity.draw_on_top = 0;
     editor_cursor_entity.draw = drawEditorCursor;
     editor_cursor_entity.specific_data = &editor_cursor;
+    editor_cursor_entity.texture_data = &entity_texture_data[entity_texture_data_count++];
     {
         Vector3 size = { TILE_HALF_WIDTH_PX - 1, TILE_HEIGHT_PX - 1, TILE_HALF_WIDTH_PX - 1 };
         addEntity(&editor_cursor_entity, screenToEntity(mouse_x, mouse_y, camera_position_x, camera_position_y, 0), size, &entity_by_location, &current_level);
     }
-    void *entity_search_results[MAX_ENTITIES_PER_CELL];
-    Entity *top_entity_array[TOP_ENTITIES_PER_LAYER];
-    SDL_Rect top_clipping_rectangle_array[TOP_ENTITIES_PER_LAYER];
-
     // logging variables
     uint32_t ticks_log_sum, ticks_log_count, ticks_last_print;
     for (;;)
     {
-        // We want to reach a fixed frame rate, so we need to time the rendering to 
+        // We want to reach a fixed frame rate, so we need to time the rendering 
         start_time = SDL_GetTicks();
         last_user_input = user_input;
         last_mouse_x = mouse_x;
@@ -216,7 +229,7 @@ int main()
                 }
                 break;
 
-            // reset the bitflags when the button is released
+            // Reset the bitflags when the button is released
             case SDL_MOUSEBUTTONUP:
                 switch (user_event.button.button)
                 {
@@ -294,6 +307,22 @@ int main()
                 }
                 break;
             }
+            case SDL_WINDOWEVENT:
+            {
+                switch (user_event.window.event)
+                {
+                case SDL_WINDOWEVENT_SIZE_CHANGED:
+                {
+                    SDL_Rect window_rect = { 0, 0, user_event.window.data1, user_event.window.data2 };
+                    {
+                        int maximum_dimension = (window_rect.w > window_rect.h) ? window_rect.w : window_rect.h;
+                        render_scale = (maximum_dimension + TILE_HALF_WIDTH_PX * on_screen_tiles - 1) / (TILE_HALF_WIDTH_PX * on_screen_tiles);
+                    }
+                    SDL_RenderSetScale(main_renderer, (float)render_scale, (float)render_scale);
+                }
+                break;
+                }
+            }
             }
         }
 
@@ -363,9 +392,9 @@ int main()
         Vector3 camera_world_bottom_right = screenToWorld(window_rect.w, window_rect.h, camera_position_x, camera_position_y, current_level.size.y - 1);
         
         int a_min = clamp(camera_world_top_left.x + camera_world_top_left.y + camera_world_top_right.z, 0, 
-                (current_level.size.x + current_level.size.y + current_level.size.z - 3));
+            (current_level.size.x + current_level.size.y + current_level.size.z - 3));
         int a_max = clamp(camera_world_bottom_right.x + camera_world_bottom_right.y + camera_world_bottom_left.z, 0, 
-                (current_level.size.x + current_level.size.y + current_level.size.z - 3));
+            (current_level.size.x + current_level.size.y + current_level.size.z - 3));
 
         SDL_Rect source_rectangle = { 0, 0, texture_width, texture_height };
 
@@ -431,8 +460,18 @@ int main()
                 if (top_entity_array[i]->draw) 
                 {
                     top_entity_array[i]->draw(top_entity_array[i], main_renderer, 
-                            camera_position_x, camera_position_y, top_clipping_rectangle_array[i]);
+                        camera_position_x, camera_position_y, top_clipping_rectangle_array[i]);
                 }
+            }
+        }
+
+        for (int i = 0; i < entity_texture_data_count; i++)
+        {
+            if (entity_texture_data[i].animation_frame_mask)
+            {
+                SDL_SetTextureAlphaMod(entity_texture_data[i].animation_frame_mask, 32);
+                SDL_RenderCopy(main_renderer, entity_texture_data[i].animation_frame_mask, NULL, &entity_texture_data[i].bounds_rectangle);
+                SDL_SetTextureAlphaMod(entity_texture_data[i].animation_frame_mask, SDL_ALPHA_OPAQUE);
             }
         }
 

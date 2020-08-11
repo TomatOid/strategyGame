@@ -24,7 +24,7 @@ void toAllCapsAndUnderScores(char *str)
     } while (*(str++));
 }
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     char buffer[BUFFER_SIZE] = { 0 };
     FILE *header_file = fopen("textures_generated.h", "w+");
