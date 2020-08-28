@@ -7,13 +7,13 @@
 #include "textures_generated.h"
 #include "HashTable.h"
 #include "entity.h"
+#include "components.h"
 
 #define SCROLL_COOLDOWN 100
 #define FRAME_MILISECONDS 20
-#define MAX_ENTITIES 128
 #define MAX_ENTITIES_PER_CELL 64
 #define TOP_ENTITIES_PER_LAYER 64
-#define MAX_ENTITY_SHADOWS 64
+#define SCREEN_GRID_SIZE_PX 70
 
 int camera_position_x, camera_position_y; // the top left corner of the viewport
 int render_scale = 2;
@@ -24,10 +24,62 @@ Entity *top_entity_array[TOP_ENTITIES_PER_LAYER];
 SDL_Rect top_clipping_rectangle_array[TOP_ENTITIES_PER_LAYER];
 TextureData entity_texture_data[MAX_ENTITIES] = { 0 };
 size_t entity_texture_data_count = 0;
+uint64_t *screen_grid;
+size_t screen_grid_width, screen_grid_height;
 
 int min(int a, int b)
 {
     return (a < b) ? a : b;
+}
+
+int abs(int a)
+{
+    return (a < 0) ? -a : a;
+}
+
+SDL_Rect rectangleIntersect(SDL_Rect a, SDL_Rect b)
+{
+    int intersection_min_x = -min(-a.x, -b.x);
+    int intersection_max_x = min(a.x + a.w, b.x + b.w);
+    int intersection_min_y = -min(-a.y, -b.y);
+    int intersection_max_y = min(a.y + a.h, b.y + b.h);
+    //a.x = (a.w == 0) ? b.x : (b.w == 0) ? a.x : intersection_min_x;
+    //a.y = (a.h == 0) ? b.y : (b.h == 0) ? a.y : intersection_min_y;
+    // if the rectangles do not intersect in the
+    //a.x = ((intersection_max_x < intersection_min_x) && (intersection_max_y < intersection_min_y)) ? a.x : intersection_min_x;
+    if ((intersection_max_x <= intersection_min_x) || (intersection_max_y <= intersection_min_y))
+    {
+        a.w = 0;
+        a.h = 0;
+        return a;
+    }
+    a.x = intersection_min_x;
+    a.y = intersection_min_y;
+    a.w = intersection_max_x - intersection_min_x;
+    a.h = intersection_max_y - intersection_min_y;
+    //a.w = ((intersection_max_x < intersection_min_x) || (intersection_max_y < intersection_min_y)) ? 0 : intersection_max_x - intersection_min_x;
+    //a.h = ((intersection_max_x < intersection_min_x) || (intersection_max_y < intersection_min_y)) ? 0 : intersection_max_y - intersection_min_y;
+    return a;
+}
+
+SDL_Rect rectangleUnion(SDL_Rect a, SDL_Rect b)
+{
+    //if (!b.w && !b.h) return a; 
+    //if (!a.w && !a.h) return b;
+    int union_min_x = min(a.x, b.x);
+    int union_max_x = -min(-a.x - a.w, -b.x - b.w);
+    int union_min_y = min(a.y, b.y);
+    int union_max_y = -min(-a.y - a.h, -b.y - b.h);
+    SDL_Rect res;
+    //res.x = union_min_x;
+    //res.y = union_min_y;
+    res.x = (b.w == 0 && b.h == 0) ? a.x : ((a.w == 0 && a.h == 0) ? b.x : union_min_x);
+    res.y = (b.h == 0 && b.w == 0) ? a.y : ((a.h == 0 && a.w == 0) ? b.y : union_min_y);
+    //res.w = union_max_x - union_min_x;
+    //res.h = union_max_y - union_min_y;
+    res.w = (b.w == 0 && b.h == 0) ? a.w : ((a.w == 0 && a.h == 0) ? b.w : union_max_x - union_min_x);
+    res.h = (b.h == 0 && b.w == 0) ? a.h : ((a.h == 0 && a.w == 0) ? b.h : union_max_y - union_min_y);
+    return res;
 }
 
 typedef struct 
@@ -79,6 +131,38 @@ Vector3 screenToEntity(int screen_x, int screen_y, int camera_x, int camera_y, i
     return entity_coords;
 }
 
+int doOverlapTesting(SDL_Rect screen_rectangle)
+{
+    int min_x = clamp(screen_rectangle.x / SCREEN_GRID_SIZE_PX, 0, screen_grid_width - 1);
+    int max_x = clamp((screen_rectangle.x + screen_rectangle.w) / SCREEN_GRID_SIZE_PX, 0, screen_grid_width - 1);
+    int min_y = clamp(screen_rectangle.y / SCREEN_GRID_SIZE_PX, 0, screen_grid_height - 1);
+    int max_y = clamp((screen_rectangle.y + screen_rectangle.h) / SCREEN_GRID_SIZE_PX, 0, screen_grid_height - 1);
+    uint64_t checks = 0;
+    for (int x = min_x; x <= max_x; x++)
+    {
+        for (int y = min_y; y <= max_y; y++)
+        {
+            checks |= screen_grid[x + y * screen_grid_width];
+        }
+    }
+    if (checks)
+    {
+        for (int i = 0; i < 64; i++)
+        {
+            if ((checks >> i) & 1)
+            {
+                for (int j = 0; j < (MAX_ENTITIES + 63) / 64; j++)
+                {
+                    //printf("%d\n", i * ((MAX_ENTITIES + 63) / 64) + j);
+                    SDL_Rect *union_rect = &entity_texture_data[i * ((MAX_ENTITIES + 63) / 64) + j].union_rectangle;
+                    *union_rect = rectangleUnion(*union_rect, rectangleIntersect(entity_texture_data[i * ((MAX_ENTITIES + 63) / 64) + j].bounds_rectangle, screen_rectangle));
+                }
+            }
+        }
+        return 1;
+    } else return 0;
+}
+
 void drawEditorCursor(Entity *cursor_entity, SDL_Renderer *renderer, int camera_x, int camera_y, SDL_Rect clipping_rectangle)
 {
     char tile = ((PlacementCursor *)cursor_entity->specific_data)->tile_id;
@@ -96,12 +180,30 @@ void drawEditorCursor(Entity *cursor_entity, SDL_Renderer *renderer, int camera_
         int intersection_max_y = min(clipping_rectangle.y + clipping_rectangle.h, screen_y + texture_height);
         SDL_Rect src_rect = { intersection_min_x - screen_x, intersection_min_y - screen_y,
             intersection_max_x - intersection_min_x, intersection_max_y - intersection_min_y };
-        SDL_Rect dest_rect = { intersection_min_x, intersection_min_y, intersection_max_x - intersection_min_x, intersection_max_y - intersection_min_y };
+        SDL_Rect dest_rect = { intersection_min_x, intersection_min_y, intersection_max_x - intersection_min_x,
+            intersection_max_y - intersection_min_y };
         SDL_RenderCopy(renderer, tile_textures[tile], &src_rect, &dest_rect);
         cursor_entity->texture_data->amimation_frame = tile_textures[tile];
         cursor_entity->texture_data->animation_frame_mask = tile_mask_textures[tile];
         SDL_Rect bounds = { screen_x, screen_y, texture_width, texture_height };
         cursor_entity->texture_data->bounds_rectangle = bounds;
+        cursor_entity->texture_data->union_rectangle = bounds;
+        cursor_entity->texture_data->union_rectangle.w = 0;
+        cursor_entity->texture_data->union_rectangle.h = 0;
+
+        int min_x = clamp(bounds.x / SCREEN_GRID_SIZE_PX, 0, screen_grid_width - 1);
+        int max_x = clamp((bounds.x + bounds.w) / SCREEN_GRID_SIZE_PX, 0, screen_grid_width - 1);
+        int min_y = clamp(bounds.y / SCREEN_GRID_SIZE_PX, 0, screen_grid_height - 1);
+        int max_y = clamp((bounds.y + bounds.h) / SCREEN_GRID_SIZE_PX, 0, screen_grid_height - 1);
+        uint64_t index_bitflag = 1 << ((cursor_entity->texture_data - entity_texture_data) / (sizeof(TextureData) * ((MAX_ENTITIES + 63) / 64)));
+        //printf("%lu flag\n", index_bitflag);
+        for (int x = min_x; x <= max_x; x++)
+        {
+            for (int y = min_y; y <= max_y; y++)
+            {
+                screen_grid[x + y * screen_grid_width] |= index_bitflag;
+            }
+        }
     }
 }
 
@@ -146,6 +248,10 @@ int main()
     SDL_RenderSetScale(main_renderer, render_scale, render_scale);
     window_rect.w /= render_scale;
     window_rect.h /= render_scale;
+    screen_grid_width = (window_rect.w + SCREEN_GRID_SIZE_PX - 1) / SCREEN_GRID_SIZE_PX;
+    screen_grid_height = (window_rect.h + SCREEN_GRID_SIZE_PX - 1) / SCREEN_GRID_SIZE_PX;
+    screen_grid = malloc(screen_grid_width * screen_grid_height * sizeof(uint64_t));
+
     // We will use these values later when drawing
     int texture_width, texture_height;
     SDL_QueryTexture(tile_textures[GRASS_TILE], NULL, NULL, &texture_width, &texture_height);
@@ -157,9 +263,8 @@ int main()
         // if the file does not exist, create a blank level
         current_level.size.x = 128;
         current_level.size.y = 6;
-        current_level.size.z = 138;
+        current_level.size.z = 128;
         current_level.tiles = calloc(current_level.size.x * current_level.size.y * current_level.size.z, 1);
-
     }
 
     // Initialize the hash table
@@ -224,6 +329,7 @@ int main()
                         Vector3 world_position = entityToWorldPosition(editor_cursor_entity.position);
                         setTileAt(editor_cursor.tile_id, world_position, &current_level);
                         printf("placed block at: %d %d %d\n", world_position.x, world_position.y, world_position.z);
+                        exit(0);
                     }
                     break;
                 }
@@ -313,6 +419,13 @@ int main()
                 {
                 case SDL_WINDOWEVENT_SIZE_CHANGED:
                 {
+                    if ((user_event.window.data1 + SCREEN_GRID_SIZE_PX - 1) / SCREEN_GRID_SIZE_PX != screen_grid_width || (user_event.window.data2 + SCREEN_GRID_SIZE_PX - 1) / SCREEN_GRID_SIZE_PX)
+                    {
+                        screen_grid_width = (user_event.window.data1 + SCREEN_GRID_SIZE_PX - 1) / SCREEN_GRID_SIZE_PX;
+                        screen_grid_height = (user_event.window.data2 + SCREEN_GRID_SIZE_PX - 1) / SCREEN_GRID_SIZE_PX;
+                        screen_grid = realloc(screen_grid, screen_grid_width * screen_grid_height * sizeof(uint64_t));
+                        printf("%d %d\n", screen_grid_width, screen_grid_height);
+                    }
                     SDL_Rect window_rect = { 0, 0, user_event.window.data1, user_event.window.data2 };
                     {
                         int maximum_dimension = (window_rect.w > window_rect.h) ? window_rect.w : window_rect.h;
@@ -325,6 +438,9 @@ int main()
             }
             }
         }
+
+        // clear the screen grid
+        memset(screen_grid, 0, screen_grid_width * screen_grid_height * sizeof(uint64_t));
 
         // now do actions associated with each input
         if (user_input.decrease_level && !last_user_input.decrease_level)
@@ -451,6 +567,9 @@ int main()
                         // calculate the position at which to draw it
                         SDL_Rect destination_rectangle = { screen_x, screen_y, source_rectangle.w, source_rectangle.h};
                         SDL_RenderCopy(main_renderer, tile_textures[current_tile], NULL, &destination_rectangle);
+                        destination_rectangle.y += TILE_HALF_DEPTH_PX;
+                        destination_rectangle.h -= TILE_HALF_DEPTH_PX;
+                        if (doOverlapTesting(destination_rectangle));// puts("overlap");
                     }
                 }
             }
@@ -469,7 +588,9 @@ int main()
         {
             if (entity_texture_data[i].animation_frame_mask)
             {
-                SDL_SetTextureAlphaMod(entity_texture_data[i].animation_frame_mask, 32);
+                SDL_Rect union_rect = entity_texture_data[i].union_rectangle;
+                //printf("%f\n", 128 * (float)(union_rect.w * union_rect.h) / (float)(entity_texture_data[i].bounds_rectangle.w * entity_texture_data[i].bounds_rectangle.h));
+                SDL_SetTextureAlphaMod(entity_texture_data[i].animation_frame_mask, 194 * (float)(union_rect.w * union_rect.h) / (float)(entity_texture_data[i].bounds_rectangle.w * entity_texture_data[i].bounds_rectangle.h));
                 SDL_RenderCopy(main_renderer, entity_texture_data[i].animation_frame_mask, NULL, &entity_texture_data[i].bounds_rectangle);
                 SDL_SetTextureAlphaMod(entity_texture_data[i].animation_frame_mask, SDL_ALPHA_OPAQUE);
             }

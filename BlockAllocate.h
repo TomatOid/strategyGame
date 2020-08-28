@@ -29,7 +29,6 @@ void* blockAlloc(BlockPage* page)
         return NULL; 
     }
     void* blk = page->free[my_block];
-
     memset(blk, 0, page->blksize);
     return blk;
 }
@@ -49,7 +48,7 @@ int blockFree(BlockPage* page, void* blk)
 void makePage(BlockPage* res, size_t num_blocks, size_t block_size)
 {
     // rounding block_size up to be a multiple of size void* to avoid any potential allignment issues
-    block_size = ((block_size + sizeof(void*) - 1) / sizeof(void*)) * sizeof(void*);
+    // block_size = ((block_size + sizeof(void*) - 1) / sizeof(void*)) * sizeof(void*);
     // allocate all the memory
     res->pool = calloc(num_blocks, block_size);
     res->free = calloc(num_blocks, sizeof(void*));

@@ -36,6 +36,7 @@ typedef struct TextureData
     SDL_Texture *amimation_frame;
     SDL_Texture *animation_frame_mask;
     SDL_Rect bounds_rectangle;
+    SDL_Rect union_rectangle;
 } TextureData;
 
 typedef struct Entity
