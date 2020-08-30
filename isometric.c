@@ -45,23 +45,10 @@ SDL_Rect rectangleIntersect(SDL_Rect a, SDL_Rect b)
     int intersection_max_y = min(a.y + a.h, b.y + b.h);
     a.x = intersection_min_x;
     a.y = intersection_min_y;
-    a.w = ((intersection_max_x <= intersection_min_x) || (intersection_max_y <= intersection_min_y)) ? 0 : intersection_max_x - intersection_min_x;
-    a.h = ((intersection_max_x <= intersection_min_x) || (intersection_max_y <= intersection_min_y)) ? 0 : intersection_max_y - intersection_min_y;
+    int rectangles_intersect = (intersection_max_x > intersection_min_x) && (intersection_max_y > intersection_min_y);
+    a.w = -rectangles_intersect & (intersection_max_x - intersection_min_x);
+    a.h = -rectangles_intersect & (intersection_max_y - intersection_min_y);
     return a;
-}
-
-SDL_Rect rectangleUnion(SDL_Rect a, SDL_Rect b)
-{
-    int union_min_x = min(a.x, b.x);
-    int union_max_x = -min(-a.x - a.w, -b.x - b.w);
-    int union_min_y = min(a.y, b.y);
-    int union_max_y = -min(-a.y - a.h, -b.y - b.h);
-    SDL_Rect res;
-    res.x = (b.w == 0 && b.h == 0) ? a.x : ((a.w == 0 && a.h == 0) ? b.x : union_min_x);
-    res.y = (b.h == 0 && b.w == 0) ? a.y : ((a.h == 0 && a.w == 0) ? b.y : union_min_y);
-    res.w = (b.w == 0 && b.h == 0) ? a.w : ((a.w == 0 && a.h == 0) ? b.w : union_max_x - union_min_x);
-    res.h = (b.h == 0 && b.w == 0) ? a.h : ((a.h == 0 && a.w == 0) ? b.h : union_max_y - union_min_y);
-    return res;
 }
 
 typedef struct 
@@ -94,8 +81,8 @@ Vector3 screenToWorld(int screen_x, int screen_y, int camera_x, int camera_y, in
 {
     Vector3 world_coords;
     int term_a = (screen_y + TILE_HALF_DEPTH_PX / 2 + camera_y + (world_y) * TILE_HEIGHT_PX) / (TILE_HALF_DEPTH_PX);
-    int term_b = (screen_x + camera_x > 0) ? (screen_x + TILE_HALF_WIDTH_PX / 2 + camera_x) / (TILE_HALF_WIDTH_PX) 
-        : (screen_x - TILE_HALF_WIDTH_PX / 2 + camera_x) / (TILE_HALF_WIDTH_PX);
+    int sign_compensation = (screen_x + camera_x > 0) * TILE_HALF_WIDTH_PX - TILE_HALF_WIDTH_PX / 2;
+    int term_b = (screen_x + sign_compensation + camera_x) / (TILE_HALF_WIDTH_PX); 
     world_coords.x = (term_a + term_b - 1) / 2;
     world_coords.y = world_y;
     world_coords.z = (term_a - term_b + 1) / 2;
@@ -484,10 +471,10 @@ int main()
         // y = 0  -- level height  
 
         // Find the world coordinates of the four corners of the screen so that we only draw what we need
-        Vector3 camera_world_top_left = screenToWorld(0, -2 * TILE_HALF_DEPTH_PX - TILE_HEIGHT_PX, camera_position_x, camera_position_y, 0);
-        Vector3 camera_world_top_right = screenToWorld(window_rect.w / 2, -2 * TILE_HALF_DEPTH_PX - TILE_HEIGHT_PX, camera_position_x, camera_position_y, 0);
-        Vector3 camera_world_bottom_left = screenToWorld(0, window_rect.h, camera_position_x, camera_position_y, current_level.size.y - 1);
-        Vector3 camera_world_bottom_right = screenToWorld(window_rect.w, window_rect.h, camera_position_x, camera_position_y, current_level.size.y - 1);
+        Vector3 camera_world_top_left = clampVector3(screenToWorld(0, -2 * TILE_HALF_DEPTH_PX - TILE_HEIGHT_PX, camera_position_x, camera_position_y, 0), (Vector3) { 0, 0, 0 }, current_level.size);
+        Vector3 camera_world_top_right = clampVector3(screenToWorld(window_rect.w, -2 * TILE_HALF_DEPTH_PX - TILE_HEIGHT_PX, camera_position_x, camera_position_y, 0), (Vector3) { 0, 0, 0 }, current_level.size);
+        Vector3 camera_world_bottom_left = clampVector3(screenToWorld(0, window_rect.h, camera_position_x, camera_position_y, current_level.size.y - 1), (Vector3) { 0, 0, 0 }, current_level.size);
+        Vector3 camera_world_bottom_right = clampVector3(screenToWorld(window_rect.w, window_rect.h, camera_position_x, camera_position_y, current_level.size.y - 1), (Vector3) { 0, 0, 0 }, current_level.size);
         
         int a_min = clamp(camera_world_top_left.x + camera_world_top_left.y + camera_world_top_right.z, 0, 
             (current_level.size.x + current_level.size.y + current_level.size.z - 3));
@@ -507,7 +494,7 @@ int main()
                 for (int c = -min(-camera_world_top_left.x, -(a - camera_world_bottom_left.z - b + 1)); c <= c_max; c++)
                 {
                     Vector3 world = { c, b, a - b - c };
-                    char current_tile = getTileAt(world, &current_level);
+                    char current_tile = getTileAtUnsafe(world, &current_level);
                     int cell_has_entity = current_tile & CELL_HAS_ENTITY_FLAG;
                     if (cell_has_entity)
                     {
@@ -540,7 +527,7 @@ int main()
                 for (int c = -min(-camera_world_top_left.x, -(a - camera_world_bottom_left.z - b + 1)); c <= c_max; c++)
                 {
                     Vector3 world = { c, b, a - b - c };
-                    char current_tile = getTileAt(world, &current_level);
+                    char current_tile = getTileAtUnsafe(world, &current_level);
                     int screen_x, screen_y;
                     worldToScreen(world, camera_position_x, camera_position_y, &screen_x, &screen_y);
                     current_tile &= (char)~CELL_HAS_ENTITY_FLAG;
@@ -551,7 +538,7 @@ int main()
                         SDL_RenderCopy(main_renderer, tile_textures[current_tile], NULL, &destination_rectangle);
                         destination_rectangle.y += TILE_HALF_DEPTH_PX;
                         destination_rectangle.h -= TILE_HALF_DEPTH_PX;
-                        if (doOverlapTesting(destination_rectangle));// puts("overlap");
+                        doOverlapTesting(destination_rectangle);
                     }
                 }
             }

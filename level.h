@@ -92,7 +92,13 @@ char getTileAt(Vector3 position, Level *level)
     {
         return level->tiles[position.y + position.x * level->size.y + position.z * level->size.y * level->size.x];
     }
+    puts("Out of bounds access");
     return 0;
+}
+
+char getTileAtUnsafe(Vector3 position, Level *level)
+{
+    return level->tiles[position.y + position.x * level->size.y + position.z * level->size.y * level->size.x];
 }
 
 int setTileAt(char tile, Vector3 position, Level *level)

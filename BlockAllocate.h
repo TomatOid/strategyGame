@@ -9,7 +9,7 @@
 // items of the same size need to be allocated dynamically
 typedef struct
 {
-    void* pool;
+    char* pool;
     void** free;
     ptrdiff_t top;
     size_t blksize;
@@ -54,10 +54,10 @@ void makePage(BlockPage* res, size_t num_blocks, size_t block_size)
     res->free = calloc(num_blocks, sizeof(void*));
 
     // now we need to fill up the free stack 
-    intptr_t ptr = (intptr_t)res->pool;
+    char* ptr = res->pool;
     for (size_t i = 0; i < num_blocks; i++)
     {
-        res->free[num_blocks - i - 1] = (void*)ptr;
+        res->free[num_blocks - i - 1] = ptr;
         ptr += block_size;
     }
     res->top = num_blocks;

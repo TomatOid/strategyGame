@@ -44,9 +44,9 @@ int clamp(int number, int minimum, int maximum)
 
 Vector3 clampVector3(Vector3 vector, Vector3 floor, Vector3 ceiling)
 {
-    vector.x = clamp(vector.x, floor.x, ceiling.x);
-    vector.y = clamp(vector.y, floor.y, ceiling.y);
-    vector.z = clamp(vector.z, floor.z, ceiling.z);
+    vector.x = clamp(vector.x, floor.x, ceiling.x - 1);
+    vector.y = clamp(vector.y, floor.y, ceiling.y - 1);
+    vector.z = clamp(vector.z, floor.z, ceiling.z - 1);
     return vector;
 }
 
