@@ -47,9 +47,9 @@ typedef struct Entity
     Vector3 position;
     Vector3 size;
     //unsigned int entity_id;
-    int type;
     int draw_on_top;
     int layer;
+    int type;
     void *specific_data;
     TextureData *texture_data;
     // interface function pointers

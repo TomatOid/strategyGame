@@ -55,6 +55,7 @@ int loadLevel(Level *level, const char *path)
     fread(level->tiles, sizeof(char), next_copy_size, level_file);
     // now, copy the start position
     fread(&level->start_positions, sizeof(Vector3), sizeof(level->start_positions) / sizeof(Vector3), level_file);
+    fclose(level_file);
     return 1;
 }
 
@@ -81,6 +82,8 @@ int saveLevel(Level *level, const char *path)
     fwrite(level->tiles, sizeof(char), level->size.x * level->size.y * level->size.z, level_file);
 
     fwrite(&level->start_positions, sizeof(Vector3), sizeof(level->start_positions) / sizeof(Vector3), level_file);
+
+    fclose(level_file);
     return 1;
 }
 

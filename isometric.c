@@ -288,20 +288,20 @@ int main()
             case SDL_MOUSEBUTTONDOWN:
                 switch (user_event.button.button)
                 {
-                    // Go into panning mode when the left button is down
-                    case SDL_BUTTON_LEFT:
-                    {
-                        user_input.pan = 1;
-                        break;
-                    }
-                    // Place tile   
-                    case SDL_BUTTON_RIGHT:
-                    {
-                        Vector3 world_position = entityToWorldPosition(editor_cursor_entity.position);
-                        setTileAt(editor_cursor.tile_id, world_position, &current_level);
-                        printf("placed block at: %d %d %d\n", world_position.x, world_position.y, world_position.z);
-                    }
+                // Go into panning mode when the left button is down
+                case SDL_BUTTON_LEFT:
+                {
+                    user_input.pan = 1;
                     break;
+                }
+                // Place tile   
+                case SDL_BUTTON_RIGHT:
+                {
+                    Vector3 world_position = entityToWorldPosition(editor_cursor_entity.position);
+                    setTileAt(editor_cursor.tile_id, world_position, &current_level);
+                    printf("placed block at: %d %d %d\n", world_position.x, world_position.y, world_position.z);
+                }
+                break;
                 }
                 break;
 
@@ -309,11 +309,11 @@ int main()
             case SDL_MOUSEBUTTONUP:
                 switch (user_event.button.button)
                 {
-                    case SDL_BUTTON_LEFT:
-                    {
-                        user_input.pan = 0;
-                        break;
-                    }
+                case SDL_BUTTON_LEFT:
+                {
+                    user_input.pan = 0;
+                    break;
+                }
                 }
                 break;
             case SDL_MOUSEWHEEL:
@@ -343,21 +343,21 @@ int main()
             {
                 switch (user_event.key.keysym.sym)
                 {
-                    case SDLK_w:
-                    {
-                        user_input.increase_level = 1;
-                        break;
-                    }
-                    case SDLK_s:
-                    {
-                        user_input.decrease_level = 1;
-                        break;
-                    }
-                    case SDLK_e:
-                    {
-                        user_input.cycle_editor_mode = 1;
-                        break;
-                    }
+                case SDLK_w:
+                {
+                    user_input.increase_level = 1;
+                    break;
+                }
+                case SDLK_s:
+                {
+                    user_input.decrease_level = 1;
+                    break;
+                }
+                case SDLK_e:
+                {
+                    user_input.cycle_editor_mode = 1;
+                    break;
+                }
                 }
                 break;
             }
@@ -366,20 +366,20 @@ int main()
             {
                 switch (user_event.key.keysym.sym)
                 {
-                    case SDLK_w:
-                    {
-                        user_input.increase_level = 0;
-                        break;
-                    }
-                    case SDLK_s:
-                    {
-                        user_input.decrease_level = 0;
-                        break;
-                    }
-                    case SDLK_e:
-                    {
-                        user_input.cycle_editor_mode = 0;
-                    }
+                case SDLK_w:
+                {
+                    user_input.increase_level = 0;
+                    break;
+                }
+                case SDLK_s:
+                {
+                    user_input.decrease_level = 0;
+                    break;
+                }
+                case SDLK_e:
+                {
+                    user_input.cycle_editor_mode = 0;
+                }
                 }
                 break;
             }
@@ -484,6 +484,10 @@ int main()
         SDL_Rect source_rectangle = { 0, 0, texture_width, texture_height };
 
         // *** Drawing Code ***
+        // It is critical that everything is drawn in the correct order.
+        // We are drawing in "q-bert layers", where the components of the
+        // coordinates each tile in each layer add up to 'a'. 
+        // They remind me of the background in q-bert, hence the name.
         for (int a = a_min; a <= a_max; a++)
         {
             int top_entities_index = 0;
@@ -503,6 +507,9 @@ int main()
                         worldToScreen(world, camera_position_x, camera_position_y, &screen_x, &screen_y);
                         SDL_Rect clipping_rect = { screen_x, screen_y, texture_width, texture_height };
                         size_t return_count = findAllInTable(&entity_by_location, key, entity_search_results, MAX_ENTITIES_PER_CELL);
+                        // If multiple entities are in the same cell, we want it to make sense to the eye
+                        // So we sort first by the entities' layer value, then if that is the same, by the
+                        // sum of their entity space x y and z components
                         if (return_count > 1) { qsort(entity_search_results, return_count, sizeof(Entity *), entityLayerCompare); }
                         
                         for (size_t i = 0; i < return_count; i++)
@@ -522,7 +529,6 @@ int main()
             
             for (int b = 0; b <= b_max; b++)
             {
-                //int b = 2;
                 int c_max = min(a - b, camera_world_bottom_right.x - 1);
                 for (int c = -min(-camera_world_top_left.x, -(a - camera_world_bottom_left.z - b + 1)); c <= c_max; c++)
                 {
@@ -558,6 +564,7 @@ int main()
             if (entity_texture_data[i].animation_frame_mask)
             {
                 SDL_Rect union_rect = entity_texture_data[i].union_rectangle;
+                // Set the cover shadow's alpha based on how much its corresponding entity is covered up
                 SDL_SetTextureAlphaMod(entity_texture_data[i].animation_frame_mask, min(194 * (float)(union_rect.w * union_rect.h) / (float)(entity_texture_data[i].bounds_rectangle.w * entity_texture_data[i].bounds_rectangle.h), 64));
                 SDL_RenderCopy(main_renderer, entity_texture_data[i].animation_frame_mask, NULL, &entity_texture_data[i].bounds_rectangle);
                 SDL_SetTextureAlphaMod(entity_texture_data[i].animation_frame_mask, SDL_ALPHA_OPAQUE);
