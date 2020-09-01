@@ -205,7 +205,7 @@ int main()
     SDL_Init(SDL_INIT_EVERYTHING);
     SDL_Window *main_window;
     SDL_Renderer *main_renderer;
-    SDL_CreateWindowAndRenderer(1280, 720, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED, &main_window, &main_renderer);
+    SDL_CreateWindowAndRenderer(1280, 720, SDL_RENDERER_ACCELERATED | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED, &main_window, &main_renderer);
     loadAllTextures(main_renderer);
 
     // More SDL graphics stuff
