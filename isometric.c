@@ -14,6 +14,7 @@
 #define MAX_ENTITIES_PER_CELL 64
 #define TOP_ENTITIES_PER_LAYER 64
 #define SCREEN_GRID_SIZE_PX 70
+#define RENDER_TARGET_STACK_MAX 32
 
 int camera_position_x, camera_position_y; // the top left corner of the viewport
 int render_scale = 2;
@@ -23,6 +24,8 @@ void *entity_search_results[MAX_ENTITIES_PER_CELL];
 Entity *top_entity_array[TOP_ENTITIES_PER_LAYER];
 SDL_Rect top_clipping_rectangle_array[TOP_ENTITIES_PER_LAYER];
 TextureData entity_texture_data[MAX_ENTITIES] = { 0 };
+SDL_Texture *render_target_stack[RENDER_TARGET_STACK_MAX];
+size_t render_target_top = 0;
 size_t entity_texture_data_count = 0;
 uint64_t *screen_grid;
 size_t screen_grid_width, screen_grid_height;
@@ -49,6 +52,19 @@ SDL_Rect rectangleIntersect(SDL_Rect a, SDL_Rect b)
     a.w = -rectangles_intersect & (intersection_max_x - intersection_min_x);
     a.h = -rectangles_intersect & (intersection_max_y - intersection_min_y);
     return a;
+}
+
+void pushRenderTarget(SDL_Renderer *renderer, SDL_Texture *target)
+{
+    SDL_assert(render_target_top < RENDER_TARGET_STACK_MAX);
+    render_target_stack[render_target_top++] = SDL_GetRenderTarget(renderer);
+    SDL_SetRenderTarget(renderer, target);
+}
+
+void popRenderTarget(SDL_Renderer *renderer)
+{
+    SDL_assert(render_target_top > 0);
+    SDL_SetRenderTarget(renderer, render_target_stack[--render_target_top]);
 }
 
 typedef struct 
@@ -216,9 +232,13 @@ int main()
         int maximum_dimension = (display_mode.w > display_mode.h) ? display_mode.w : display_mode.h;
         render_scale = maximum_dimension / (TILE_HALF_WIDTH_PX * on_screen_tiles);
     }
-    SDL_RenderSetScale(main_renderer, render_scale, render_scale);
+    // This represents the size of the non-pixelated layer
+    SDL_Rect ui_layer_rect = window_rect;
     window_rect.w /= render_scale;
     window_rect.h /= render_scale;
+    // This texture is for the pixelated game layer
+    SDL_Texture *game_window_texture = SDL_CreateTexture(main_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, window_rect.w, window_rect.h);
+    int game_window_needs_resize = 0;
     screen_grid_width = (window_rect.w + SCREEN_GRID_SIZE_PX - 1) / SCREEN_GRID_SIZE_PX;
     screen_grid_height = (window_rect.h + SCREEN_GRID_SIZE_PX - 1) / SCREEN_GRID_SIZE_PX;
     screen_grid = malloc(screen_grid_width * screen_grid_height * sizeof(uint64_t));
@@ -272,8 +292,6 @@ int main()
         last_mouse_x = mouse_x;
         last_mouse_y = mouse_y;
         SDL_GetMouseState(&mouse_x, &mouse_y);
-        mouse_x /= render_scale;
-        mouse_y /= render_scale;
         SDL_Event user_event;
         while (SDL_PollEvent(&user_event))
         {
@@ -395,12 +413,16 @@ int main()
                         screen_grid_height = (user_event.window.data2 + SCREEN_GRID_SIZE_PX - 1) / SCREEN_GRID_SIZE_PX;
                         screen_grid = realloc(screen_grid, screen_grid_width * screen_grid_height * sizeof(uint64_t));
                     }
-                    SDL_Rect window_rect = { 0, 0, user_event.window.data1, user_event.window.data2 };
+                    window_rect = (SDL_Rect) { 0, 0, user_event.window.data1, user_event.window.data2 };
                     {
                         int maximum_dimension = (window_rect.w > window_rect.h) ? window_rect.w : window_rect.h;
                         render_scale = (maximum_dimension + TILE_HALF_WIDTH_PX * on_screen_tiles - 1) / (TILE_HALF_WIDTH_PX * on_screen_tiles);
                     }
-                    SDL_RenderSetScale(main_renderer, (float)render_scale, (float)render_scale);
+                    ui_layer_rect = window_rect;
+                    window_rect.h /= render_scale;
+                    window_rect.w /= render_scale;
+                    game_window_needs_resize = 1;
+                    //SDL_RenderSetScale(main_renderer, (float)render_scale, (float)render_scale);
                 }
                 break;
                 }
@@ -437,22 +459,22 @@ int main()
         // do panning
         if (user_input.pan)
         {
-            camera_position_x -= mouse_x - last_mouse_x;
-            camera_position_y -= mouse_y - last_mouse_y;
+            camera_position_x -= (mouse_x - last_mouse_x) / render_scale;
+            camera_position_y -= (mouse_y - last_mouse_y) / render_scale;
         }
         // now move the cursor entity
         {
             // if the draw_on_top property is set to true, that sprite should be grid-locked to avoid spoiling the 3d effect
             if (editor_cursor_entity.draw_on_top)
             {
-                Vector3 cursor_world = screenToWorld(mouse_x, mouse_y - editor_cursor_entity.position.y,
+                Vector3 cursor_world = screenToWorld(mouse_x / render_scale, mouse_y / render_scale - editor_cursor_entity.position.y,
                         camera_position_x, camera_position_y, editor_cursor_entity.position.y / TILE_HEIGHT_PX);
                 cursor_world.y = editor_cursor_entity.position.y / (ENTITY_POSITION_MULTIPLIER * TILE_HEIGHT_PX);
                 moveEntity(&editor_cursor_entity, worldToEntityPosition(cursor_world), &entity_by_location, &current_level);
             }
             else
             {
-                moveEntity(&editor_cursor_entity, screenToEntity(mouse_x - TILE_HALF_WIDTH_PX, mouse_y - TILE_HALF_DEPTH_PX - editor_cursor_entity.position.y / ENTITY_POSITION_MULTIPLIER,
+                moveEntity(&editor_cursor_entity, screenToEntity(mouse_x / render_scale - TILE_HALF_WIDTH_PX, mouse_y / render_scale - TILE_HALF_DEPTH_PX - editor_cursor_entity.position.y / ENTITY_POSITION_MULTIPLIER,
                         camera_position_x, camera_position_y, editor_cursor_entity.position.y), &entity_by_location, &current_level);
             }
         }
@@ -488,6 +510,8 @@ int main()
         // We are drawing in "q-bert layers", where the components of the
         // coordinates each tile in each layer add up to 'a'. 
         // They remind me of the background in q-bert, hence the name.
+        pushRenderTarget(main_renderer, game_window_texture);
+        SDL_RenderClear(main_renderer);
         for (int a = a_min; a <= a_max; a++)
         {
             int top_entities_index = 0;
@@ -571,10 +595,22 @@ int main()
             }
         }
 
-        SDL_SetRenderTarget(main_renderer, NULL);
+        popRenderTarget(main_renderer);
+        SDL_RenderCopy(main_renderer, game_window_texture, NULL, &ui_layer_rect);
+
+        // UI stuff would go here
+        SDL_RenderCopy(main_renderer, tile_textures[1], NULL, &(SDL_Rect) { 0, 0, texture_width, texture_height });
+
         SDL_RenderPresent(main_renderer);
         SDL_SetRenderDrawColor(main_renderer, 255, 255, 255, 255);
         SDL_RenderClear(main_renderer);
+        
+        if (game_window_needs_resize)
+        {
+            SDL_DestroyTexture(game_window_texture);
+            game_window_texture = SDL_CreateTexture(main_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, window_rect.w, window_rect.h);
+            game_window_needs_resize = 0;
+        }
 
         uint32_t diff_time = SDL_GetTicks() - start_time;
         if (diff_time < FRAME_MILISECONDS)
