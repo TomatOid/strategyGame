@@ -1,4 +1,5 @@
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -8,6 +9,7 @@
 #include "HashTable.h"
 #include "entity.h"
 #include "components.h"
+#include "text_cache.h"
 
 #define SCROLL_COOLDOWN 100
 #define FRAME_MILISECONDS 20
@@ -15,6 +17,7 @@
 #define TOP_ENTITIES_PER_LAYER 64
 #define SCREEN_GRID_SIZE_PX 70
 #define RENDER_TARGET_STACK_MAX 32
+#define TEXT_CACHE_SIZE 100
 
 int camera_position_x, camera_position_y; // the top left corner of the viewport
 int render_scale = 2;
@@ -282,6 +285,12 @@ int main()
         Vector3 size = { TILE_HALF_WIDTH_PX - 1, TILE_HEIGHT_PX - 1, TILE_HALF_WIDTH_PX - 1 };
         addEntity(&editor_cursor_entity, screenToEntity(mouse_x, mouse_y, camera_position_x, camera_position_y, 0), size, &entity_by_location, &current_level);
     }
+
+    TTF_Init();
+    TextCache text_cache = makeTextCache(TEXT_CACHE_SIZE);
+    default_font = TTF_OpenFont("./Renogare-Regular.ttf", 100);
+    if (!default_font) puts("error loading font");
+    char *position_string_buf[20];
     // logging variables
     uint32_t ticks_log_sum, ticks_log_count, ticks_last_print;
     for (;;)
@@ -599,7 +608,14 @@ int main()
         SDL_RenderCopy(main_renderer, game_window_texture, NULL, &ui_layer_rect);
 
         // UI stuff would go here
-        SDL_RenderCopy(main_renderer, tile_textures[1], NULL, &(SDL_Rect) { 0, 0, texture_width, texture_height });
+        {
+            memset(position_string_buf, 0, sizeof(position_string_buf));
+            SDL_itoa(mouse_x, position_string_buf, 10);
+            SDL_Texture *text = getTextureFromString(main_renderer, &text_cache, position_string_buf, default_font);
+            int text_width, text_height;
+            SDL_QueryTexture(text, NULL, NULL, &text_width, &text_height);
+            SDL_RenderCopy(main_renderer, text, NULL, &(SDL_Rect) { 0, 0, text_width, text_height });
+        }
 
         SDL_RenderPresent(main_renderer);
         SDL_SetRenderDrawColor(main_renderer, 255, 255, 255, 255);
