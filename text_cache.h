@@ -6,7 +6,7 @@
 #include "min_heap.h"
 
 TTF_Font *default_font;
-SDL_Color default_text_color = { 0, 255, 0 };
+SDL_Color default_text_color = { 0, 0, 0 };
 
 #define MAX_STRING_SIZE 256
 
@@ -17,6 +17,7 @@ typedef struct
     SDL_Texture *texture;
 } TextCacheElement;
 
+// In retrospect, I think I could have used a ring buffer instead of a min-heap
 typedef struct
 {
     size_t size;
@@ -29,6 +30,7 @@ typedef struct
 
 TextCache makeTextCache(size_t size)
 {
+    assert(size > 0);
     BlockPage page;
     makePage(&page, size, sizeof(HashItem));
     HashTable table = { calloc(size, sizeof(HashItem *)), NULL, page, size, 0 }; 
@@ -47,6 +49,8 @@ uint64_t hashString(char *string, intptr_t font)
     return hash;
 }
 
+// String should be null-terminated
+// Immediate mode text rendering
 SDL_Texture *getTextureFromString(SDL_Renderer *renderer, TextCache *cache, char *string, TTF_Font *font)
 {
     uint64_t hash_value = hashString(string, (intptr_t)font);
@@ -72,7 +76,7 @@ SDL_Texture *getTextureFromString(SDL_Renderer *renderer, TextCache *cache, char
         SDL_DestroyTexture(replace->texture);
     }
     else replace = &cache->elements[cache->count++];
-    SDL_Surface *temp_surface = TTF_RenderText_Solid(font, string, default_text_color);
+    SDL_Surface *temp_surface = TTF_RenderText_Blended(font, string, default_text_color);
     replace->texture = SDL_CreateTextureFromSurface(renderer, temp_surface);
     SDL_FreeSurface(temp_surface);
     strncpy(replace->string, string, MAX_STRING_SIZE);

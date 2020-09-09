@@ -18,7 +18,6 @@ typedef struct Level
     uint32_t entities_count;
 } Level;
 
-
 int setFlagAt(Vector3 position, Level *level)
 {
     if (position.x >= 0 && position.x < level->size.x

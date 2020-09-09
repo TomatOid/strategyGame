@@ -41,7 +41,7 @@ typedef struct TextureData
 
 typedef struct Entity
 {
-    // entity positions have pixel-level precision
+    // entity positions have sub-pixel-level precision
     // to convert to block coordinates, divide x and z by TILE_HALF_WIDTH_PX
     // and divide y by TILE_HEIGHT_PX
     Vector3 position;

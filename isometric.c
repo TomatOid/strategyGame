@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <assert.h>
 #include "vector.h"
 #include "level.h"
 #include "textures_generated.h"
@@ -59,14 +60,14 @@ SDL_Rect rectangleIntersect(SDL_Rect a, SDL_Rect b)
 
 void pushRenderTarget(SDL_Renderer *renderer, SDL_Texture *target)
 {
-    SDL_assert(render_target_top < RENDER_TARGET_STACK_MAX);
+    assert(render_target_top < RENDER_TARGET_STACK_MAX);
     render_target_stack[render_target_top++] = SDL_GetRenderTarget(renderer);
     SDL_SetRenderTarget(renderer, target);
 }
 
 void popRenderTarget(SDL_Renderer *renderer)
 {
-    SDL_assert(render_target_top > 0);
+    assert(render_target_top > 0);
     SDL_SetRenderTarget(renderer, render_target_stack[--render_target_top]);
 }
 
@@ -290,7 +291,7 @@ int main()
     TextCache text_cache = makeTextCache(TEXT_CACHE_SIZE);
     default_font = TTF_OpenFont("./Renogare-Regular.ttf", 100);
     if (!default_font) puts("error loading font");
-    char *position_string_buf[20];
+    char position_string_buf[20];
     // logging variables
     uint32_t ticks_log_sum, ticks_log_count, ticks_last_print;
     for (;;)
@@ -431,7 +432,6 @@ int main()
                     window_rect.h /= render_scale;
                     window_rect.w /= render_scale;
                     game_window_needs_resize = 1;
-                    //SDL_RenderSetScale(main_renderer, (float)render_scale, (float)render_scale);
                 }
                 break;
                 }
@@ -468,8 +468,8 @@ int main()
         // do panning
         if (user_input.pan)
         {
-            camera_position_x -= (mouse_x - last_mouse_x) / render_scale;
-            camera_position_y -= (mouse_y - last_mouse_y) / render_scale;
+            camera_position_x -= mouse_x / render_scale - last_mouse_x / render_scale;
+            camera_position_y -= mouse_y / render_scale - last_mouse_y / render_scale;
         }
         // now move the cursor entity
         {
@@ -495,7 +495,6 @@ int main()
         //    / \
         // Z v   v X
 
-        // the reason why I add the level height is because geometry
         //          camera
         // | *   | /|
         // |## # |/ |
@@ -607,20 +606,20 @@ int main()
         popRenderTarget(main_renderer);
         SDL_RenderCopy(main_renderer, game_window_texture, NULL, &ui_layer_rect);
 
-        // UI stuff would go here
+        // UI stuff
         {
             memset(position_string_buf, 0, sizeof(position_string_buf));
-            SDL_itoa(mouse_x, position_string_buf, 10);
+            SDL_itoa(mouse_x / render_scale, position_string_buf, 10);
             SDL_Texture *text = getTextureFromString(main_renderer, &text_cache, position_string_buf, default_font);
             int text_width, text_height;
             SDL_QueryTexture(text, NULL, NULL, &text_width, &text_height);
-            SDL_RenderCopy(main_renderer, text, NULL, &(SDL_Rect) { 0, 0, text_width, text_height });
+            SDL_RenderCopy(main_renderer, text, NULL, &(SDL_Rect) { (ui_layer_rect.w - text_width) / 2, ui_layer_rect.h - text_height, text_width, text_height });
         }
 
         SDL_RenderPresent(main_renderer);
         SDL_SetRenderDrawColor(main_renderer, 255, 255, 255, 255);
         SDL_RenderClear(main_renderer);
-        
+
         if (game_window_needs_resize)
         {
             SDL_DestroyTexture(game_window_texture);
