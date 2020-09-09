@@ -26,6 +26,44 @@ Vector3 worldToEntityPosition(Vector3 world_position)
     return entity_position;
 }
 
+// Fill screen_x and screen_y with the screen coordinates of the entity position
+void entityToScreen(Vector3 entity, int camera_x, int camera_y, int *screen_x, int *screen_y)
+{
+    *screen_x = (entity.x - entity.z) / ENTITY_POSITION_MULTIPLIER - camera_x;
+    *screen_y = (entity.x + entity.z) / (2 * ENTITY_POSITION_MULTIPLIER) - entity.y / ENTITY_POSITION_MULTIPLIER - camera_y;
+}
+
+void worldToScreen(Vector3 world, int camera_x, int camera_y, int *screen_x, int *screen_y)
+{
+    *screen_x = (world.x - world.z) * TILE_HALF_WIDTH_PX - camera_x;
+    *screen_y = -world.y * (TILE_HEIGHT_PX) + (world.x + world.z) * TILE_HALF_DEPTH_PX - camera_y;
+}
+
+// Convert screen coordinates to world coordinates
+// In order to have a unique solution, the world y must be provided
+Vector3 screenToWorld(int screen_x, int screen_y, int camera_x, int camera_y, int world_y)
+{
+    Vector3 world_coords;
+    int term_a = (screen_y + TILE_HALF_DEPTH_PX / 2 + camera_y + (world_y) * TILE_HEIGHT_PX) / (TILE_HALF_DEPTH_PX);
+    int sign_compensation = (screen_x + camera_x > 0) * TILE_HALF_WIDTH_PX - TILE_HALF_WIDTH_PX / 2;
+    int term_b = (screen_x + sign_compensation + camera_x) / (TILE_HALF_WIDTH_PX); 
+    world_coords.x = (term_a + term_b - 1) / 2;
+    world_coords.y = world_y;
+    world_coords.z = (term_a - term_b + 1) / 2;
+    return world_coords;
+}
+
+Vector3 screenToEntity(int screen_x, int screen_y, int camera_x, int camera_y, int entity_y)
+{
+    Vector3 entity_coords;
+    int term_a = (screen_y + camera_y + entity_y / ENTITY_POSITION_MULTIPLIER) * 2;
+    int term_b = (screen_x + camera_x);
+    entity_coords.x = ENTITY_POSITION_MULTIPLIER * (term_a + term_b) / 2;
+    entity_coords.y = entity_y;
+    entity_coords.z = ENTITY_POSITION_MULTIPLIER * (term_a - term_b) / 2;
+    return entity_coords;
+}
+
 enum
 {
     ENTITY_EDITOR_CURSOR
@@ -115,7 +153,7 @@ void moveEntity(Entity *entity, Vector3 new_position, HashTable *table, Level *l
                 {
                     clearFlagAt(old_point, level);
                     uint64_t key = hashVector3(old_point);
-                    removeFromTableByValue(table, key, entity);
+                    assert(removeFromTableByValue(table, key, entity));
                 }
             }
         }
@@ -131,7 +169,7 @@ void moveEntity(Entity *entity, Vector3 new_position, HashTable *table, Level *l
                 {
                     setFlagAt(new_point, level);
                     uint64_t key = hashVector3(new_point);
-                    insertToTable(table, key, entity);
+                    assert(insertToTable(table, key, entity));
                 }
             }
         }

@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <stdbool.h>
+#include <assert.h>
 #include "BlockAllocate.h"
 
 typedef struct HashItem
@@ -26,7 +27,8 @@ bool insertToTable(HashTable *table, uint64_t key, void *value)
     // using a block allocator for this instead
     // of calloc to avoid heap fragmentation
     HashItem *curr = blockAlloc(&table->page);
-    if (!curr) return false;
+    //if (!curr) return false;
+    assert(curr);
     curr->key = key;
     curr->value = value;
     // insert the item at the beginning of the linked list
@@ -68,6 +70,7 @@ size_t findAllInTable(HashTable *table, uint64_t key, void **return_buffer, size
             return_buffer[index++] = curr->value;
         }
     }
+    table->last = NULL;
     return index;
 }
 
@@ -81,9 +84,9 @@ void *removeFromTable(HashTable *table, uint64_t key)
 
     if (curr) 
     { 
-        HashItem *after = (curr)->next;
-        void *value = (curr)->value;
-        if (prev) (prev)->next = after;
+        HashItem *after = curr->next;
+        void *value = curr->value;
+        if (prev) prev->next = after;
         if (!blockFree(&table->page, curr)) return NULL;
         if (!prev) table->items[hash] = after;
         table->num--;
@@ -92,22 +95,21 @@ void *removeFromTable(HashTable *table, uint64_t key)
     else return NULL;
 }
 
-void removeFromTableByValue(HashTable *table, uint64_t key, void *value)
+bool removeFromTableByValue(HashTable *table, uint64_t key, void *value)
 {
     size_t hash = key % table->len;
     HashItem *curr = table->items[hash];
     HashItem *prev = NULL;
     // loop untill either we hit the end of the list or the keys match
-    while (curr && curr->key != key && curr->value != value) { prev = curr; curr = curr->next; }
+    while (curr && (curr->key != key || curr->value != value)) { prev = curr; curr = curr->next; }
 
     if (curr) 
     { 
-        HashItem *after = (curr)->next;
-        if (prev) (prev)->next = after;
-        if (!blockFree(&table->page, curr)) return;
+        HashItem *after = curr->next;
+        if (prev) prev->next = after;
+        if (!blockFree(&table->page, curr)) return false;
         if (!prev) table->items[hash] = after;
         table->num--;
-        return;
-    }
-    else return;
+        return true;
+    } else return false;
 }

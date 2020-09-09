@@ -28,6 +28,7 @@ int main(int argc, char **argv)
 {
     char buffer[BUFFER_SIZE] = { 0 };
     FILE *header_file = fopen("textures_generated.h", "w+");
+    fprintf(header_file, "#pragma once\n");
     fprintf(header_file, "#include \"texture_utils.h\"\n");
     fprintf(header_file, "SDL_Texture *tile_textures[256] = { NULL };\n");
     fprintf(header_file, "SDL_Texture *tile_mask_textures[256] = { NULL }; \n");
