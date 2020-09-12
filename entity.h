@@ -7,7 +7,7 @@
 #include "level.h"
 
 // This determines the size of the fractional part of the entity position
-#define ENTITY_POSITION_MULTIPLIER 2
+#define ENTITY_POSITION_MULTIPLIER 16
 
 Vector3 entityToWorldPosition(Vector3 entity_position)
 {
@@ -72,6 +72,7 @@ enum
 typedef struct TextureData
 {
     SDL_Texture *amimation_frame;
+    SDL_Texture *temporary_frame_buffer;
     SDL_Texture *animation_frame_mask;
     SDL_Rect bounds_rectangle;
     SDL_Rect union_rectangle;
@@ -97,10 +98,16 @@ typedef struct Entity
 
 int entityLayerCompare(const void *a, const void *b)
 {
-    int a_layer = ((Entity *)a)->layer;
-    int b_layer = ((Entity *)b)->layer;
+    Entity *a_e = *(Entity **)a;
+    Entity *b_e = *(Entity **)b;
+    int a_layer = a_e->layer;
+    int b_layer = b_e->layer;
     if (a_layer != b_layer) return a_layer - b_layer;
-    return componentSum(((Entity *)a)->position) - componentSum(((Entity *)b)->position);
+    //if (a_e->position.y != b_e->position.y) return (a_e->position.y - b_e->position.y);
+    //puts("Here");
+    return componentSum(addVector3(a_e->position, a_e->size)) - componentSum(addVector3(b_e->position, b_e->size));
+
+    //return -componentSum(addVector3(((Entity *)a)->position, ((Entity *)a)->size)) + componentSum(addVector3(((Entity *)b)->position, ((Entity *)b)->size));
 }
 
 int pointIsInPrism(Vector3 prism_least_corner, Vector3 prism_most_corner, Vector3 point)
@@ -151,9 +158,9 @@ void moveEntity(Entity *entity, Vector3 new_position, HashTable *table, Level *l
                 Vector3 old_point = { x, y, z };
                 if (!pointIsInPrism(new_position_world_floor, new_position_world_ceil, old_point))
                 {
-                    clearFlagAt(old_point, level);
                     uint64_t key = hashVector3(old_point);
-                    assert(removeFromTableByValue(table, key, entity));
+                    // check if we are the last entity in the cell
+                    if (removeFromTableByValue(table, key, entity) < 2) clearFlagAt(old_point, level);
                 }
             }
         }

@@ -95,13 +95,16 @@ void *removeFromTable(HashTable *table, uint64_t key)
     else return NULL;
 }
 
-bool removeFromTableByValue(HashTable *table, uint64_t key, void *value)
+int removeFromTableByValue(HashTable *table, uint64_t key, void *value)
 {
     size_t hash = key % table->len;
     HashItem *curr = table->items[hash];
     HashItem *prev = NULL;
+    int key_matches_count = 0;
     // loop untill either we hit the end of the list or the keys match
-    while (curr && (curr->key != key || curr->value != value)) { prev = curr; curr = curr->next; }
+    while (curr && (curr->key != key || curr->value != value)) { key_matches_count += curr->key == key; prev = curr; curr = curr->next; }
+    HashItem *remaining = curr;
+    while (remaining) {key_matches_count += remaining->key == key; remaining = remaining->next; }
 
     if (curr) 
     { 
@@ -110,6 +113,6 @@ bool removeFromTableByValue(HashTable *table, uint64_t key, void *value)
         if (!blockFree(&table->page, curr)) return false;
         if (!prev) table->items[hash] = after;
         table->num--;
-        return true;
-    } else return false;
+        return key_matches_count;
+    } else return 0;
 }

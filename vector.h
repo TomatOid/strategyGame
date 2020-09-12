@@ -26,6 +26,9 @@ uint64_t hashVector3(Vector3 vec)
     result |=  (uint64_t)vec.x & 0x00FFFFFF;
     result |= ((uint64_t)vec.z & 0x00FFFFFF) << 24;
     result |= ((uint64_t)vec.y) << 48;
+    result ^= result << 13;
+    result ^= result >> 7;
+    result ^= result << 17;
     return result;
 }
 

@@ -1,3 +1,4 @@
+#pragma once
 #include "texture_utils.h"
 SDL_Texture *tile_textures[256] = { NULL };
 SDL_Texture *tile_mask_textures[256] = { NULL }; 

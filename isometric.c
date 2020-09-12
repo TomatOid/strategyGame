@@ -78,7 +78,6 @@ int main()
     window_rect.h /= render_scale;
     // This texture is for the pixelated game layer
     SDL_Texture *game_window_texture = SDL_CreateTexture(main_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, window_rect.w, window_rect.h);
-    int game_window_needs_resize = 0;
     screen_grid_width = (window_rect.w + SCREEN_GRID_SIZE_PX - 1) / SCREEN_GRID_SIZE_PX;
     screen_grid_height = (window_rect.h + SCREEN_GRID_SIZE_PX - 1) / SCREEN_GRID_SIZE_PX;
     screen_grid = malloc(screen_grid_width * screen_grid_height * sizeof(uint64_t));
@@ -116,9 +115,20 @@ int main()
     editor_cursor_entity.draw = drawEditorCursor;
     editor_cursor_entity.specific_data = &editor_cursor;
     editor_cursor_entity.texture_data = &entity_texture_data[entity_texture_data_count++];
+    editor_cursor_entity.texture_data->temporary_frame_buffer = SDL_CreateTexture(main_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, texture_width, texture_height);
+    SDL_SetTextureBlendMode(editor_cursor_entity.texture_data->temporary_frame_buffer, SDL_BLENDMODE_BLEND);
     {
         Vector3 size = { TILE_HALF_WIDTH_PX - 1, TILE_HEIGHT_PX - 1, TILE_HALF_WIDTH_PX - 1 };
         addEntity(&editor_cursor_entity, screenToEntity(mouse_x, mouse_y, camera_position_x, camera_position_y, 0), size, &entity_by_location, &current_level);
+    }
+
+    PlacementCursor dummy_cursor = { AIR_TILE };
+    Entity dummy_entity = { .type = ENTITY_EDITOR_CURSOR, .draw_on_top = 0, .draw = drawEditorCursor, .specific_data = &dummy_cursor, .texture_data = &entity_texture_data[entity_texture_data_count++] };
+    dummy_entity.texture_data->temporary_frame_buffer = SDL_CreateTexture(main_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, texture_width, texture_height);
+    SDL_SetTextureBlendMode(dummy_entity.texture_data->temporary_frame_buffer, SDL_BLENDMODE_BLEND);
+    {
+        Vector3 size = { TILE_HALF_WIDTH_PX - 1, TILE_HEIGHT_PX - 1, TILE_HALF_WIDTH_PX - 1 };
+        addEntity(&dummy_entity, addVector3(worldToEntityPosition((Vector3) { 10, 2, 10}), (Vector3) {64, 0, 0}), size, &entity_by_location, &current_level);
     }
 
     TTF_Init();
@@ -265,7 +275,8 @@ int main()
                     ui_layer_rect = window_rect;
                     window_rect.h /= render_scale;
                     window_rect.w /= render_scale;
-                    game_window_needs_resize = 1;
+                    SDL_DestroyTexture(game_window_texture);
+                    game_window_texture = SDL_CreateTexture(main_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, window_rect.w, window_rect.h);
                 }
                 break;
                 }
@@ -338,13 +349,6 @@ int main()
         SDL_RenderPresent(main_renderer);
         SDL_SetRenderDrawColor(main_renderer, 255, 255, 255, 255);
         SDL_RenderClear(main_renderer);
-
-        if (game_window_needs_resize)
-        {
-            SDL_DestroyTexture(game_window_texture);
-            game_window_texture = SDL_CreateTexture(main_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, window_rect.w, window_rect.h);
-            game_window_needs_resize = 0;
-        }
 
         uint32_t diff_time = SDL_GetTicks() - start_time;
         if (diff_time < FRAME_MILISECONDS)

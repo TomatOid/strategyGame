@@ -15,7 +15,7 @@
 #define RENDER_TARGET_STACK_MAX 32
 #define MAX_ENTITIES 128
 
-void *entity_search_results[MAX_ENTITIES_PER_CELL];
+Entity *entity_search_results[MAX_ENTITIES_PER_CELL];
 Entity *top_entity_array[TOP_ENTITIES_PER_LAYER];
 SDL_Rect top_clipping_rectangle_array[TOP_ENTITIES_PER_LAYER];
 TextureData entity_texture_data[MAX_ENTITIES] = { 0 };
@@ -74,8 +74,6 @@ int doOverlapTesting(SDL_Rect screen_rectangle)
 
 void drawEditorCursor(Entity *cursor_entity, SDL_Renderer *renderer, int camera_x, int camera_y, SDL_Rect clipping_rectangle)
 {
-    clipping_rectangle.y++;
-    clipping_rectangle.h--;
     char tile = ((PlacementCursor *)cursor_entity->specific_data)->tile_id;
     int screen_x, screen_y;
     entityToScreen(cursor_entity->position, camera_x, camera_y, &screen_x, &screen_y);
@@ -93,7 +91,8 @@ void drawEditorCursor(Entity *cursor_entity, SDL_Renderer *renderer, int camera_
             intersection_max_x - intersection_min_x, intersection_max_y - intersection_min_y };
         SDL_Rect dest_rect = { intersection_min_x, intersection_min_y, intersection_max_x - intersection_min_x,
             intersection_max_y - intersection_min_y };
-        SDL_RenderCopy(renderer, tile_textures[tile], &src_rect, &dest_rect);
+        SDL_RenderCopy(renderer, cursor_entity->texture_data->temporary_frame_buffer, &src_rect, &dest_rect);
+        // TODO: Update the animation frames before calling drawLevel
         cursor_entity->texture_data->amimation_frame = tile_textures[tile];
         cursor_entity->texture_data->animation_frame_mask = tile_mask_textures[tile];
         SDL_Rect bounds = { screen_x, screen_y, texture_width, texture_height };
@@ -127,6 +126,16 @@ void drawLevel(SDL_Renderer *main_renderer, Level current_level, SDL_Texture *ga
         int window_width, window_height;
         SDL_QueryTexture(game_window_texture, NULL, NULL, &window_width, &window_height);
         window_rect = (SDL_Rect) { 0, 0, window_width, window_height };
+    }
+
+    SDL_SetRenderDrawColor(main_renderer, 128, 180, 255, 0);
+    // Reset all of the sprite's frame_buffers
+    for (int i = 0; i < entity_texture_data_count; i++)
+    {
+        pushRenderTarget(main_renderer, entity_texture_data[i].temporary_frame_buffer);
+        SDL_RenderClear(main_renderer);
+        SDL_RenderCopy(main_renderer, entity_texture_data[i].amimation_frame, NULL, NULL);
+        popRenderTarget(main_renderer);
     }
 
     // Find the world coordinates of the four corners of the screen so that we only draw what we need
@@ -171,7 +180,7 @@ void drawLevel(SDL_Renderer *main_renderer, Level current_level, SDL_Texture *ga
                     // If multiple entities are in the same cell, we want it to make sense to the eye
                     // So we sort first by the entities' layer value, then if that is the same, by the
                     // sum of their entity space x y and z components
-                    if (return_count > 1) { qsort(entity_search_results, return_count, sizeof(Entity *), entityLayerCompare); printf("sorting %lu elements, key %lu\n", return_count, key); }
+                    if (return_count > 1) { qsort(entity_search_results, return_count, sizeof(Entity *), entityLayerCompare); }
                     
                     for (size_t i = 0; i < return_count; i++)
                     {   
@@ -183,6 +192,22 @@ void drawLevel(SDL_Renderer *main_renderer, Level current_level, SDL_Texture *ga
                             top_clipping_rectangle_array[top_entities_index++] = clipping_rect;
                         }
                         else if (cell_entity->draw) cell_entity->draw(cell_entity, main_renderer, camera_position_x, camera_position_y, clipping_rect);
+                        // To prevent weirdness with other that are behind cell_entity and halfway occupying a cell that gets drawn after,
+                        // we just stamp cell_entity's frame to the entities that are behind it but sharing this cell
+                        for (int j = i - 1; j >= 0; j--)
+                        {
+                            int rectangle_screen_x, rectangle_screen_y;
+                            entityToScreen(cell_entity->position, camera_position_x, camera_position_y, &rectangle_screen_x, &rectangle_screen_y);
+                            SDL_Rect cell_entity_rect = { rectangle_screen_x, rectangle_screen_y, cell_entity->texture_data->bounds_rectangle.w, cell_entity->texture_data->bounds_rectangle.h };
+                            entityToScreen(entity_search_results[j]->position, camera_position_x, camera_position_y, &rectangle_screen_x, &rectangle_screen_y);
+                            SDL_Rect other_entity_rect = { rectangle_screen_x, rectangle_screen_y, entity_search_results[j]->texture_data->bounds_rectangle.w, entity_search_results[j]->texture_data->bounds_rectangle.h };
+                            pushRenderTarget(main_renderer, entity_search_results[j]->texture_data->temporary_frame_buffer);
+                            SDL_Rect overlap = rectangleIntersect(cell_entity_rect, other_entity_rect);
+                            SDL_RenderCopy(main_renderer, cell_entity->texture_data->temporary_frame_buffer, 
+                                &(SDL_Rect) { overlap.x - cell_entity_rect.x, overlap.y - cell_entity_rect.y, overlap.w, overlap.h },
+                                &(SDL_Rect) { overlap.x - other_entity_rect.x, overlap.y - other_entity_rect.y, overlap.w, overlap.h }); 
+                            popRenderTarget(main_renderer);
+                        }
                     }
                 }
             }

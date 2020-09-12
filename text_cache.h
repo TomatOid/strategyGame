@@ -6,7 +6,7 @@
 #include "min_heap.h"
 
 TTF_Font *default_font;
-SDL_Color default_text_color = { 0, 0, 0 };
+SDL_Color default_text_color = { 255, 245, 255 };
 
 #define MAX_STRING_SIZE 256
 
@@ -42,7 +42,7 @@ uint64_t hashString(char *string, intptr_t font)
 {
     uint64_t hash = 5381 + font;
     int c;
-    while (c = *string++)
+    while ((c = *string++))
     {
         hash = ((hash << 5 | hash >> 59) + hash) + c; 
     }
